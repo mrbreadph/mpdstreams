@@ -547,18 +547,10 @@
             } catch (error) {
                 console.error('Failed to load manifest directly:', error);
                 
-                if (error.code === 2002) { // HTTP error
-                    updateStatus(`CORS error: ${streamConfig.name} may need different access method. Error: ${error.message}`, 'error');
-                } else {
-                    updateStatus(`Direct access failed for ${streamConfig.name}: ${error.message}`, 'error');
-                }
-                
-                console.log('Full error details:', error);
-                
-                // For HTTP streams that fail, show stream unavailable message
+                // For CV PPV (HTTP stream), show simple "Stream Unavailable" for any error
                 if (streamConfig.manifest.startsWith('http://')) {
-                    updateStatus('Stream Unavailable - Use PL PPV (HTTPS Direct) instead', 'error');
-                    updateStreamInfo('CV PPV - Stream Unavailable (CORS Blocked)');
+                    updateStatus('CV PPV: Stream Unavailable', 'error');
+                    updateStreamInfo('CV PPV - Stream Unavailable');
                     
                     // Clear the video and show a message
                     video.src = '';
@@ -566,17 +558,26 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
                             <rect width="800" height="450" fill="#1a1a1a"/>
                             <text x="400" y="200" text-anchor="middle" fill="#ff4444" font-family="Arial, sans-serif" font-size="32" font-weight="bold">
-                                ⚠️ Stream Unavailable
+                                ⚠️ CV PPV: Stream Unavailable
                             </text>
                             <text x="400" y="250" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">
-                                CORS policy blocks HTTP content
+                                Unable to access this stream
                             </text>
                             <text x="400" y="290" text-anchor="middle" fill="#4CAF50" font-family="Arial, sans-serif" font-size="20" font-weight="bold">
                                 👆 Use PL PPV (HTTPS Direct) instead
                             </text>
                         </svg>
                     `);
+                } else {
+                    // For HTTPS streams, show detailed error info
+                    if (error.code === 2002) { // HTTP error
+                        updateStatus(`CORS error: ${streamConfig.name} may need different access method. Error: ${error.message}`, 'error');
+                    } else {
+                        updateStatus(`Direct access failed for ${streamConfig.name}: ${error.message}`, 'error');
+                    }
                 }
+                
+                console.log('Full error details:', error);
             }
         }
 
