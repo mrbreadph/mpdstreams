@@ -368,22 +368,75 @@
                 const clearKeys = {};
                 clearKeys[streamConfig.key.keyId] = streamConfig.key.key;
 
+                // Get the manifest URL (proxy if needed)
+                let manifestUrl = streamConfig.manifest;
+                let networkingEngine = null;
+
+                if (streamConfig.useProxy) {
+                    manifestUrl = getProxyUrl(streamConfig.manifest);
+                    updateStatus('Using proxy for HTTP stream...', 'info');
+                    console.log('Original URL:', streamConfig.manifest);
+                    console.log('Proxied URL:', manifestUrl);
+
+                    // Configure networking engine to use proxy for all requests from this stream
+                    player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                        // Only proxy HTTP URLs from the same domain as the manifest
+                        if (request.uris[0] && request.uris[0].startsWith('http://143.44.136.110')) {
+                            console.log('Proxying segment request:', request.uris[0]);
+                            request.uris[0] = getProxyUrl(request.uris[0]);
+                        }
+                    });
+                }
+
                 player.configure({
                     drm: {
                         clearKeys: clearKeys,
                         servers: {},
                         advanced: {}
+                    },
+                    streaming: {
+                        retryParameters: {
+                            maxAttempts: 5,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5,
+                            timeout: 30000
+                        },
+                        bufferingGoal: 30,
+                        rebufferingGoal: 15,
+                        bufferBehind: 30
+                    },
+                    manifest: {
+                        retryParameters: {
+                            maxAttempts: 3,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5,
+                            timeout: 15000
+                        }
                     }
                 });
 
-                // Get the manifest URL (proxy if needed)
-                let manifestUrl = streamConfig.manifest;
-                if (streamConfig.useProxy) {
-                    manifestUrl = getProxyUrl(streamConfig.manifest);
-                    updateStatus('Using proxy for HTTP stream...', 'info');
-                }
-
                 console.log('Loading manifest:', manifestUrl);
+
+                // Test the proxy connection first if using proxy
+                if (streamConfig.useProxy) {
+                    try {
+                        updateStatus('Testing proxy connection...', 'info');
+                        const testResponse = await fetch(manifestUrl, { 
+                            method: 'HEAD',
+                            mode: 'cors'
+                        });
+                        if (!testResponse.ok) {
+                            throw new Error(`Proxy test failed: ${testResponse.status}`);
+                        }
+                        updateStatus('Proxy connection successful, loading stream...', 'info');
+                    } catch (testError) {
+                        console.error('Proxy test failed:', testError);
+                        updateStatus(`Proxy connection failed: ${testError.message}`, 'error');
+                        return;
+                    }
+                }
 
                 // Load the manifest
                 await player.load(manifestUrl);
@@ -409,9 +462,12 @@
                 console.error('Failed to load manifest:', error);
                 updateStatus(`Failed to load stream: ${error.message}`, 'error');
                 
-                // If proxy failed, suggest manual retry
+                // Enhanced error reporting for proxy issues
                 if (streamConfig.useProxy) {
-                    updateStatus('Proxy loading failed. The HTTP stream may be temporarily unavailable.', 'error');
+                    console.log('Proxy URL that failed:', getProxyUrl(streamConfig.manifest));
+                    updateStatus(`Proxy error: ${error.message}. Check browser console for details.`, 'error');
+                } else {
+                    updateStatus(`Direct stream error: ${error.message}`, 'error');
                 }
             }
         }
