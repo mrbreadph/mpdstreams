@@ -107,6 +107,24 @@
             display: block;
         }
 
+        /* Hide the progress bar/scrub bar */
+        #video-player::-webkit-media-controls-timeline {
+            display: none !important;
+        }
+
+        #video-player::-moz-range-track {
+            display: none !important;
+        }
+
+        /* For other browsers */
+        video::-webkit-media-controls-timeline {
+            display: none !important;
+        }
+
+        video::-moz-range-track {
+            display: none !important;
+        }
+
         .status {
             margin: 15px 0;
             padding: 12px;
