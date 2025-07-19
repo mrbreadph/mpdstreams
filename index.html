@@ -107,57 +107,6 @@
             display: block;
         }
 
-        /* Hide video controls for live-only experience */
-        #video-player::-webkit-media-controls-timeline {
-            display: none !important;
-        }
-
-        #video-player::-webkit-media-controls-current-time-display {
-            display: none !important;
-        }
-
-        #video-player::-webkit-media-controls-time-remaining-display {
-            display: none !important;
-        }
-
-        /* Custom video controls container */
-        .custom-controls {
-            position: relative;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 0 0 10px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-        }
-
-        .play-pause-btn {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .volume-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: white;
-        }
-
-        .live-indicator-small {
-            background: #ff4444;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
         .status {
             margin: 15px 0;
             padding: 12px;
@@ -325,16 +274,7 @@
         </div>
 
         <div class="video-container">
-            <video id="video-player" autoplay muted></video>
-            <div class="custom-controls">
-                <button class="play-pause-btn" onclick="togglePlayPause()" id="play-pause-btn">⏸️ Pause</button>
-                <div class="volume-control">
-                    <span>🔊</span>
-                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1" onchange="changeVolume()">
-                </div>
-                <div class="live-indicator-small">🔴 LIVE</div>
-                <button class="play-pause-btn" onclick="toggleFullscreen()" style="background: #FF9800;">⛶ Fullscreen</button>
-            </div>
+            <video id="video-player" controls autoplay muted></video>
             <div id="error-box" class="error-box" style="display: none;">
                 <h3 id="error-title">Stream Error</h3>
                 <p id="error-message">Unable to load stream</p>
@@ -426,63 +366,6 @@
             }
         }
 
-        // Custom video controls
-        function togglePlayPause() {
-            if (video.paused) {
-                video.play();
-                document.getElementById('play-pause-btn').textContent = '⏸️ Pause';
-            } else {
-                video.pause();
-                document.getElementById('play-pause-btn').textContent = '▶️ Play';
-            }
-        }
-
-        function changeVolume() {
-            const volumeSlider = document.getElementById('volume-slider');
-            video.volume = volumeSlider.value;
-            video.muted = volumeSlider.value == 0;
-        }
-
-        function toggleFullscreen() {
-            if (video.requestFullscreen) {
-                video.requestFullscreen();
-            } else if (video.webkitRequestFullscreen) {
-                video.webkitRequestFullscreen();
-            } else if (video.msRequestFullscreen) {
-                video.msRequestFullscreen();
-            }
-        }
-
-        // Disable seeking by preventing certain events
-        function disableSeeking() {
-            video.addEventListener('seeking', function(e) {
-                // Force back to live edge for live streams
-                if (player && player.isLive()) {
-                    const seekRange = player.seekRange();
-                    if (seekRange.end > 0) {
-                        video.currentTime = seekRange.end;
-                    }
-                }
-            });
-
-            // Disable keyboard seeking
-            video.addEventListener('keydown', function(e) {
-                // Disable arrow keys for seeking
-                if (e.keyCode === 37 || e.keyCode === 39) { // Left and Right arrows
-                    e.preventDefault();
-                }
-            });
-
-            // Update play/pause button when video state changes
-            video.addEventListener('play', function() {
-                document.getElementById('play-pause-btn').textContent = '⏸️ Pause';
-            });
-
-            video.addEventListener('pause', function() {
-                document.getElementById('play-pause-btn').textContent = '▶️ Play';
-            });
-        }
-
         // Stream configurations - Both direct access, zero Vercel usage!
         const streams = {
             1: {
@@ -515,9 +398,6 @@
         async function initApp() {
             video = document.getElementById('video-player');
             
-            // Enable live-only restrictions
-            disableSeeking();
-            
             // Start datetime updater
             updateDateTime();
             setInterval(updateDateTime, 1000); // Update every second
@@ -538,9 +418,7 @@
         // Initialize Shaka Player
         async function initPlayer() {
             try {
-                // Use modern Shaka Player initialization (v4.7+)
-                player = new shaka.Player();
-                await player.attach(video);
+                player = new shaka.Player(video);
 
                 // Configure player for optimal direct access (no proxy)
                 player.configure({
@@ -566,8 +444,14 @@
                             fuzzFactor: 0.5,
                             timeout: 15000
                         }
+                    },
+                    // Enhanced networking for direct HTTP access
+                    networking: {
+                        maxAttempts: 3,
+                        baseDelay: 1000,
+                        fuzzFactor: 0.5,
+                        timeout: 30000
                     }
-                    // Removed invalid 'networking' config
                 });
 
                 // Configure network request handler for direct access
@@ -609,7 +493,7 @@
                     updateQualitySelector();
                 });
 
-                updateStatus('Player initialized successfully', 'success');
+                updateStatus('Player initialized for direct access - Zero Vercel usage mode!', 'success');
 
                 // Auto-load first stream
                 await loadStream1();
