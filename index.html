@@ -538,7 +538,9 @@
         // Initialize Shaka Player
         async function initPlayer() {
             try {
-                player = new shaka.Player(video);
+                // Use modern Shaka Player initialization (v4.7+)
+                player = new shaka.Player();
+                await player.attach(video);
 
                 // Configure player for optimal direct access (no proxy)
                 player.configure({
@@ -564,14 +566,8 @@
                             fuzzFactor: 0.5,
                             timeout: 15000
                         }
-                    },
-                    // Enhanced networking for direct HTTP access
-                    networking: {
-                        maxAttempts: 3,
-                        baseDelay: 1000,
-                        fuzzFactor: 0.5,
-                        timeout: 30000
                     }
+                    // Removed invalid 'networking' config
                 });
 
                 // Configure network request handler for direct access
@@ -613,7 +609,7 @@
                     updateQualitySelector();
                 });
 
-                updateStatus('Player initialized for direct access - Zero Vercel usage mode!', 'success');
+                updateStatus('Player initialized successfully', 'success');
 
                 // Auto-load first stream
                 await loadStream1();
