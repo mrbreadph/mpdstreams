@@ -100,43 +100,6 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
         }
 
-        .custom-controls {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.7));
-            display: flex;
-            align-items: center;
-            padding: 10px 15px;
-            z-index: 10;
-        }
-
-        .time-display {
-            color: white;
-            font-size: 14px;
-            margin-right: 10px;
-            font-family: monospace;
-        }
-
-        .video-live-btn {
-            background: linear-gradient(45deg, #FF5722, #E64A19);
-            color: white;
-            border: none;
-            padding: 2px 6px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: bold;
-            margin-left: 5px;
-            transition: all 0.2s ease;
-        }
-
-        .video-live-btn:hover {
-            background: linear-gradient(45deg, #E64A19, #FF5722);
-            transform: scale(1.1);
-        }
-
         #video-player {
             width: 100%;
             height: auto;
@@ -243,18 +206,21 @@
             background: linear-gradient(45deg, #FF5722, #E64A19);
             color: white;
             border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
-            margin-left: 10px;
-            transition: all 0.2s ease;
+            margin: 10px auto;
+            display: block;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 87, 34, 0.3);
         }
 
         .small-live-btn:hover {
             background: linear-gradient(45deg, #E64A19, #FF5722);
-            transform: scale(1.05);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 87, 34, 0.4);
         }
 
         .error-box {
@@ -352,16 +318,14 @@
 
         <div class="video-container">
             <video id="video-player" controls autoplay muted></video>
-            <div class="custom-controls">
-                <div class="time-display" id="video-time">00:00 / 00:00</div>
-                <button class="video-live-btn" onclick="refreshLive()">🔴 LIVE</button>
-            </div>
             <div id="error-box" class="error-box" style="display: none;">
                 <h3 id="error-title">Stream Error</h3>
                 <p id="error-message">Unable to load stream</p>
                 <p class="suggestion" id="error-suggestion">Try using the other stream</p>
             </div>
         </div>
+
+        <button class="small-live-btn" onclick="refreshLive()">🔴 Refresh Live</button>
 
         <div id="status" class="status info">Initializing player...</div>
 
@@ -396,26 +360,6 @@
             
             errorBox.style.display = 'none';
             videoElement.style.display = 'block';
-        }
-
-        // Update video time display
-        function updateVideoTime() {
-            if (video && !isNaN(video.duration)) {
-                const current = Math.floor(video.currentTime);
-                const duration = Math.floor(video.duration);
-                
-                const currentMin = Math.floor(current / 60);
-                const currentSec = current % 60;
-                const durationMin = Math.floor(duration / 60);
-                const durationSec = duration % 60;
-                
-                const currentTime = `${currentMin.toString().padStart(2, '0')}:${currentSec.toString().padStart(2, '0')}`;
-                const totalTime = `${durationMin.toString().padStart(2, '0')}:${durationSec.toString().padStart(2, '0')}`;
-                
-                document.getElementById('video-time').textContent = `${currentTime} / ${totalTime}`;
-            } else {
-                document.getElementById('video-time').textContent = 'LIVE';
-            }
         }
 
         // Update live datetime
@@ -606,10 +550,6 @@
 
             // Quality change detection
             video.addEventListener('loadedmetadata', updateQualityInfo);
-            
-            // Add time update listener
-            video.addEventListener('timeupdate', updateVideoTime);
-            video.addEventListener('loadedmetadata', updateVideoTime);
         }
 
         // Load Stream 1 (PL PPV)
