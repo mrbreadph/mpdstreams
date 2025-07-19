@@ -241,7 +241,7 @@
         .graph-container {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .graph-item {
@@ -256,48 +256,49 @@
             margin-bottom: 5px;
         }
 
-        .graph-bar {
-            height: 40px;
+        .line-graph {
+            height: 60px;
             border: 1px solid #555;
             border-radius: 4px;
-            background: linear-gradient(to top, #1a1a1a, #333);
+            background: #1a1a1a;
             position: relative;
             overflow: hidden;
+            padding: 5px;
         }
 
-        .graph-fill {
-            position: absolute;
-            bottom: 0;
+        .line-canvas {
             width: 100%;
-            transition: height 0.5s ease;
-            border-radius: 0 0 3px 3px;
+            height: 100%;
+            position: relative;
         }
 
-        .buffer-fill {
-            background: linear-gradient(to top, #4CAF50, #81C784);
+        .line-path {
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(0 0 3px currentColor);
         }
 
-        .bandwidth-fill {
-            background: linear-gradient(to top, #2196F3, #64B5F6);
+        .buffer-line { stroke: #4CAF50; }
+        .bandwidth-line { stroke: #2196F3; }
+        .latency-line { stroke: #FF9800; }
+        .quality-line { stroke: #9C27B0; }
+
+        .graph-grid {
+            stroke: #333;
+            stroke-width: 0.5;
+            opacity: 0.5;
         }
 
-        .latency-fill {
-            background: linear-gradient(to top, #FF9800, #FFB74D);
-        }
-
-        .quality-fill {
-            background: linear-gradient(to top, #9C27B0, #BA68C8);
-        }
-
-        .graph-value {
+        .current-value {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 11px;
+            top: 2px;
+            right: 5px;
+            font-size: 10px;
             font-weight: bold;
             color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.7);
+            padding: 2px 4px;
+            border-radius: 2px;
         }
 
         .streaming-stats {
@@ -429,31 +430,87 @@
             <h4>📊 Live Streaming Stats</h4>
             <div class="graph-container">
                 <div class="graph-item">
-                    <div class="graph-label">Buffer</div>
-                    <div class="graph-bar">
-                        <div class="graph-fill buffer-fill" id="buffer-bar" style="height: 0%"></div>
-                        <div class="graph-value" id="buffer-value">0%</div>
+                    <div class="graph-label">Buffer Level</div>
+                    <div class="line-graph">
+                        <svg class="line-canvas" viewBox="0 0 100 50">
+                            <defs>
+                                <linearGradient id="bufferGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#4CAF50;stop-opacity:0.1" />
+                                </linearGradient>
+                            </defs>
+                            <g class="graph-grid">
+                                <line x1="0" y1="12.5" x2="100" y2="12.5"/>
+                                <line x1="0" y1="25" x2="100" y2="25"/>
+                                <line x1="0" y1="37.5" x2="100" y2="37.5"/>
+                            </g>
+                            <path id="buffer-line" class="line-path buffer-line" d="M0,50"/>
+                            <path id="buffer-area" fill="url(#bufferGradient)" d="M0,50"/>
+                        </svg>
+                        <div class="current-value" id="buffer-value">0%</div>
                     </div>
                 </div>
                 <div class="graph-item">
                     <div class="graph-label">Bandwidth</div>
-                    <div class="graph-bar">
-                        <div class="graph-fill bandwidth-fill" id="bandwidth-bar" style="height: 0%"></div>
-                        <div class="graph-value" id="bandwidth-value">0 Mbps</div>
+                    <div class="line-graph">
+                        <svg class="line-canvas" viewBox="0 0 100 50">
+                            <defs>
+                                <linearGradient id="bandwidthGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#2196F3;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#2196F3;stop-opacity:0.1" />
+                                </linearGradient>
+                            </defs>
+                            <g class="graph-grid">
+                                <line x1="0" y1="12.5" x2="100" y2="12.5"/>
+                                <line x1="0" y1="25" x2="100" y2="25"/>
+                                <line x1="0" y1="37.5" x2="100" y2="37.5"/>
+                            </g>
+                            <path id="bandwidth-line" class="line-path bandwidth-line" d="M0,50"/>
+                            <path id="bandwidth-area" fill="url(#bandwidthGradient)" d="M0,50"/>
+                        </svg>
+                        <div class="current-value" id="bandwidth-value">0 Mbps</div>
                     </div>
                 </div>
                 <div class="graph-item">
                     <div class="graph-label">Latency</div>
-                    <div class="graph-bar">
-                        <div class="graph-fill latency-fill" id="latency-bar" style="height: 0%"></div>
-                        <div class="graph-value" id="latency-value">0ms</div>
+                    <div class="line-graph">
+                        <svg class="line-canvas" viewBox="0 0 100 50">
+                            <defs>
+                                <linearGradient id="latencyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#FF9800;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#FF9800;stop-opacity:0.1" />
+                                </linearGradient>
+                            </defs>
+                            <g class="graph-grid">
+                                <line x1="0" y1="12.5" x2="100" y2="12.5"/>
+                                <line x1="0" y1="25" x2="100" y2="25"/>
+                                <line x1="0" y1="37.5" x2="100" y2="37.5"/>
+                            </g>
+                            <path id="latency-line" class="line-path latency-line" d="M0,50"/>
+                            <path id="latency-area" fill="url(#latencyGradient)" d="M0,50"/>
+                        </svg>
+                        <div class="current-value" id="latency-value">0ms</div>
                     </div>
                 </div>
                 <div class="graph-item">
-                    <div class="graph-label">Quality</div>
-                    <div class="graph-bar">
-                        <div class="graph-fill quality-fill" id="quality-bar" style="height: 0%"></div>
-                        <div class="graph-value" id="quality-value">Auto</div>
+                    <div class="graph-label">Quality Score</div>
+                    <div class="line-graph">
+                        <svg class="line-canvas" viewBox="0 0 100 50">
+                            <defs>
+                                <linearGradient id="qualityGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#9C27B0;stop-opacity:0.3" />
+                                    <stop offset="100%" style="stop-color:#9C27B0;stop-opacity:0.1" />
+                                </linearGradient>
+                            </defs>
+                            <g class="graph-grid">
+                                <line x1="0" y1="12.5" x2="100" y2="12.5"/>
+                                <line x1="0" y1="25" x2="100" y2="25"/>
+                                <line x1="0" y1="37.5" x2="100" y2="37.5"/>
+                            </g>
+                            <path id="quality-line" class="line-path quality-line" d="M0,50"/>
+                            <path id="quality-area" fill="url(#qualityGradient)" d="M0,50"/>
+                        </svg>
+                        <div class="current-value" id="quality-value">Auto</div>
                     </div>
                 </div>
             </div>
@@ -487,6 +544,71 @@
         let player;
         let video;
         let currentStream = 1;
+
+        // Line graph data storage
+        const graphData = {
+            buffer: [],
+            bandwidth: [],
+            latency: [],
+            quality: []
+        };
+        const maxDataPoints = 30; // Keep last 30 data points
+
+        // Add data point to line graph
+        function addDataPoint(type, value) {
+            if (!graphData[type]) graphData[type] = [];
+            
+            graphData[type].push(value);
+            
+            // Keep only the last maxDataPoints
+            if (graphData[type].length > maxDataPoints) {
+                graphData[type].shift();
+            }
+        }
+
+        // Generate SVG path for line graph
+        function generateLinePath(data, maxValue = 100) {
+            if (data.length < 2) return "M0,50";
+            
+            const points = data.map((value, index) => {
+                const x = (index / (maxDataPoints - 1)) * 100;
+                const y = 50 - ((value / maxValue) * 50);
+                return `${x},${y}`;
+            });
+            
+            return `M${points.join(' L')}`;
+        }
+
+        // Generate SVG area path (for gradient fill)
+        function generateAreaPath(data, maxValue = 100) {
+            if (data.length < 2) return "M0,50 L100,50 L100,50 Z";
+            
+            const points = data.map((value, index) => {
+                const x = (index / (maxDataPoints - 1)) * 100;
+                const y = 50 - ((value / maxValue) * 50);
+                return `${x},${y}`;
+            });
+            
+            return `M0,50 L${points.join(' L')} L100,50 Z`;
+        }
+
+        // Update line graph
+        function updateLineGraph(type, value, maxValue = 100) {
+            addDataPoint(type, value);
+            
+            const linePath = generateLinePath(graphData[type], maxValue);
+            const areaPath = generateAreaPath(graphData[type], maxValue);
+            
+            const lineElement = document.getElementById(`${type}-line`);
+            const areaElement = document.getElementById(`${type}-area`);
+            
+            if (lineElement) {
+                lineElement.setAttribute('d', linePath);
+            }
+            if (areaElement) {
+                areaElement.setAttribute('d', areaPath);
+            }
+        }
 
         // Show error box
         function showErrorBox(title, message, suggestion) {
@@ -527,21 +649,21 @@
                     bufferPercent = Math.min((bufferSeconds / 30) * 100, 100); // 30 seconds = 100%
                 }
 
-                // Update buffer bar
-                document.getElementById('buffer-bar').style.height = `${bufferPercent}%`;
+                // Update buffer line graph
+                updateLineGraph('buffer', bufferPercent, 100);
                 document.getElementById('buffer-value').textContent = `${Math.round(bufferPercent)}%`;
 
                 // Update bandwidth
                 const bandwidth = stats.estimatedBandwidth || 0;
-                const bandwidthMbps = (bandwidth / 1000000).toFixed(1);
-                const bandwidthPercent = Math.min((bandwidth / 10000000) * 100, 100); // 10Mbps = 100%
-                document.getElementById('bandwidth-bar').style.height = `${bandwidthPercent}%`;
-                document.getElementById('bandwidth-value').textContent = `${bandwidthMbps} Mbps`;
+                const bandwidthMbps = (bandwidth / 1000000);
+                const bandwidthPercent = Math.min((bandwidthMbps / 10) * 100, 100); // 10Mbps = 100%
+                updateLineGraph('bandwidth', bandwidthPercent, 100);
+                document.getElementById('bandwidth-value').textContent = `${bandwidthMbps.toFixed(1)} Mbps`;
 
                 // Update latency (simulated based on buffer health)
                 const latency = Math.max(50, 200 - (bufferPercent * 1.5));
                 const latencyPercent = Math.max(0, 100 - (latency / 500 * 100));
-                document.getElementById('latency-bar').style.height = `${latencyPercent}%`;
+                updateLineGraph('latency', latencyPercent, 100);
                 document.getElementById('latency-value').textContent = `${Math.round(latency)}ms`;
 
                 // Update quality
@@ -561,7 +683,7 @@
                     qualityPercent = 25;
                     qualityText = `${currentHeight}p`;
                 }
-                document.getElementById('quality-bar').style.height = `${qualityPercent}%`;
+                updateLineGraph('quality', qualityPercent, 100);
                 document.getElementById('quality-value').textContent = qualityText;
 
                 // Update additional stats
@@ -777,6 +899,9 @@
                 });
 
                 updateStatus('Player initialized for direct access - Zero Vercel usage mode!', 'success');
+
+                // Initialize line graphs data
+                bufferGraphData = { buffer: [], bandwidth: [], latency: [], quality: [] };
 
                 // Auto-load first stream
                 await loadStream1();
