@@ -179,9 +179,30 @@
             margin-right: 15px;
         }
 
-        .datetime-text {
+        .error-box {
+            background: rgba(244, 67, 54, 0.1);
+            border: 2px solid #f44336;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 10px 0;
+            text-align: center;
+            color: #EF9A9A;
+        }
+
+        .error-box h3 {
+            color: #f44336;
+            margin: 0 0 10px 0;
+        }
+
+        .error-box p {
+            margin: 5px 0;
+            color: #ffffff;
+        }
+
+        .error-box .suggestion {
             color: #4CAF50;
-            font-size: 14px;
+            font-weight: bold;
+            margin-top: 10px;
         }
 
         .loading {
@@ -254,6 +275,11 @@
 
         <div class="video-container">
             <video id="video-player" controls autoplay muted></video>
+            <div id="error-box" class="error-box" style="display: none;">
+                <h3 id="error-title">Stream Error</h3>
+                <p id="error-message">Unable to load stream</p>
+                <p class="suggestion" id="error-suggestion">Try using the other stream</p>
+            </div>
         </div>
 
         <div id="status" class="status info">Initializing player...</div>
@@ -268,6 +294,28 @@
         let player;
         let video;
         let currentStream = 1;
+
+        // Show error box
+        function showErrorBox(title, message, suggestion) {
+            const errorBox = document.getElementById('error-box');
+            const videoElement = document.getElementById('video-player');
+            
+            document.getElementById('error-title').textContent = title;
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-suggestion').textContent = suggestion;
+            
+            videoElement.style.display = 'none';
+            errorBox.style.display = 'block';
+        }
+
+        // Hide error box
+        function hideErrorBox() {
+            const errorBox = document.getElementById('error-box');
+            const videoElement = document.getElementById('video-player');
+            
+            errorBox.style.display = 'none';
+            videoElement.style.display = 'block';
+        }
 
         // Update live datetime
         function updateDateTime() {
@@ -527,6 +575,9 @@
                 // Load the manifest directly
                 await player.load(manifestUrl);
 
+                // Hide error box if it was showing
+                hideErrorBox();
+
                 // Auto-play
                 try {
                     await video.play();
@@ -552,22 +603,12 @@
                     updateStatus('CV PPV: Stream Unavailable', 'error');
                     updateStreamInfo('CV PPV - Stream Unavailable');
                     
-                    // Clear the video and show a message
-                    video.src = '';
-                    video.poster = 'data:image/svg+xml;base64,' + btoa(`
-                        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
-                            <rect width="800" height="450" fill="#1a1a1a"/>
-                            <text x="400" y="200" text-anchor="middle" fill="#ff4444" font-family="Arial, sans-serif" font-size="32" font-weight="bold">
-                                ⚠️ CV PPV: Stream Unavailable
-                            </text>
-                            <text x="400" y="250" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">
-                                Unable to access this stream
-                            </text>
-                            <text x="400" y="290" text-anchor="middle" fill="#4CAF50" font-family="Arial, sans-serif" font-size="20" font-weight="bold">
-                                👆 Use PL PPV (HTTPS Direct) instead
-                            </text>
-                        </svg>
-                    `);
+                    // Show error box instead of poster
+                    showErrorBox(
+                        'CV PPV: Stream Unavailable',
+                        'Unable to access this stream',
+                        'Use PL PPV (HTTPS Direct) instead'
+                    );
                 } else {
                     // For HTTPS streams, show detailed error info
                     if (error.code === 2002) { // HTTP error
