@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MPD Stream Player - Vercel Hosted</title>
+    <title>MPD Stream - Boss Capybara</title>
     <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.7.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -144,10 +144,44 @@
 
         .quality-selector {
             margin: 10px 0;
+            text-align: center;
         }
 
         .quality-selector select {
             min-width: 200px;
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .live-dot {
+            width: 12px;
+            height: 12px;
+            background: #ff4444;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        .live-text {
+            color: #ff4444;
+            margin-right: 15px;
+        }
+
+        .datetime-text {
+            color: #4CAF50;
+            font-size: 14px;
         }
 
         .loading {
@@ -193,32 +227,22 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎬 MPD Stream Player - Vercel Hosted</h1>
+        <h1>🎬 MPD Stream - Boss Capybara</h1>
         
-        <div class="deployment-info">
-            <strong>🚀 Zero Vercel Usage Mode Activated!</strong><br>
-            • Stream 1 (HTTPS): Direct access ✅ <span style="color: #4CAF50;">Zero usage!</span><br>
-            • Stream 2 (HTTP): Direct access ✅ <span style="color: #4CAF50;">Zero usage!</span><br>
-            • Cross-device access enabled 📱💻<br>
-            • <strong>100% Free streaming - No resource consumption!</strong>
-        </div>
-
-        <div class="deployment-info" style="border-left-color: #4CAF50;">
-            <strong>🎉 Benefits of Direct Access:</strong><br>
-            • <strong>Unlimited streaming</strong> - No bandwidth limits<br>
-            • <strong>Better performance</strong> - No proxy latency<br>
-            • <strong>Free forever</strong> - Uses zero Vercel resources<br>
-            • <strong>Faster loading</strong> - Direct connection to streams
-        </div>
-
+        
         <div class="controls">
             <div class="stream-selector">
                 <button id="stream1-btn" class="active" onclick="loadStream1()">📺 PL PPV (HTTPS Direct)</button>
                 <button id="stream2-btn" onclick="loadStream2()">📺 CV PPV (HTTP Direct)</button>
+                <button id="live-btn" onclick="refreshLive()" style="background: linear-gradient(45deg, #FF5722, #E64A19);">🔴 LIVE</button>
             </div>
-            <div style="font-size: 12px; color: #4CAF50; margin-top: 10px; text-align: center;">
-                🎉 Both streams use direct access - Zero Vercel usage! Unlimited streaming!
-            </div>
+        </div>
+
+        
+        <div class="live-indicator">
+            <div class="live-dot"></div>
+            <span class="live-text">LIVE</span>
+            <span class="datetime-text" id="live-datetime">Loading...</span>
         </div>
 
         <div class="quality-selector">
@@ -244,6 +268,55 @@
         let player;
         let video;
         let currentStream = 1;
+
+        // Update live datetime
+        function updateDateTime() {
+            const now = new Date();
+            const options = {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            };
+            document.getElementById('live-datetime').textContent = now.toLocaleString(undefined, options);
+        }
+
+        // Refresh live feed
+        async function refreshLive() {
+            updateStatus('Refreshing live feed...', 'info');
+            
+            if (player && video) {
+                try {
+                    // Seek to live edge
+                    if (player.isLive()) {
+                        const seekRange = player.seekRange();
+                        if (seekRange.end > 0) {
+                            video.currentTime = seekRange.end;
+                            updateStatus('Jumped to live edge!', 'success');
+                        }
+                    } else {
+                        // Reload the current stream
+                        if (currentStream === 1) {
+                            await loadStream1();
+                        } else {
+                            await loadStream2();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Live refresh error:', error);
+                    updateStatus('Live refresh failed, reloading stream...', 'error');
+                    // Fallback: reload current stream
+                    if (currentStream === 1) {
+                        await loadStream1();
+                    } else {
+                        await loadStream2();
+                    }
+                }
+            }
+        }
 
         // Stream configurations - Both direct access, zero Vercel usage!
         const streams = {
@@ -276,6 +349,10 @@
         // Initialize the application
         async function initApp() {
             video = document.getElementById('video-player');
+            
+            // Start datetime updater
+            updateDateTime();
+            setInterval(updateDateTime, 1000); // Update every second
             
             // Install Shaka Player polyfills
             shaka.polyfill.installAll();
@@ -387,7 +464,7 @@
             currentStream = 1;
             updateStreamButtons();
             await loadManifest(streams[1]);
-            updateStreamInfo('PL PPV - HTTPS Direct Access (Zero Usage)');
+            updateStreamInfo('PL PPV - HTTPS Direct Access');
         }
 
         // Load Stream 2 (CV PPV) - Now direct access!
@@ -395,7 +472,7 @@
             currentStream = 2;
             updateStreamButtons();
             await loadManifest(streams[2]);
-            updateStreamInfo('CV PPV - HTTP Direct Access (Zero Usage)');
+            updateStreamInfo('CV PPV - HTTP Direct Access');
         }
 
         // Load manifest with DRM configuration - Direct access only!
@@ -478,9 +555,27 @@
                 
                 console.log('Full error details:', error);
                 
-                // For HTTP streams that fail, suggest trying from a CORS-enabled browser
+                // For HTTP streams that fail, show stream unavailable message
                 if (streamConfig.manifest.startsWith('http://')) {
-                    updateStatus('💡 Tip: For HTTP streams, try accessing from a browser with CORS disabled or use a CORS browser extension.', 'info');
+                    updateStatus('Stream Unavailable - Use PL PPV (HTTPS Direct) instead', 'error');
+                    updateStreamInfo('CV PPV - Stream Unavailable (CORS Blocked)');
+                    
+                    // Clear the video and show a message
+                    video.src = '';
+                    video.poster = 'data:image/svg+xml;base64,' + btoa(`
+                        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+                            <rect width="800" height="450" fill="#1a1a1a"/>
+                            <text x="400" y="200" text-anchor="middle" fill="#ff4444" font-family="Arial, sans-serif" font-size="32" font-weight="bold">
+                                ⚠️ Stream Unavailable
+                            </text>
+                            <text x="400" y="250" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="18">
+                                CORS policy blocks HTTP content
+                            </text>
+                            <text x="400" y="290" text-anchor="middle" fill="#4CAF50" font-family="Arial, sans-serif" font-size="20" font-weight="bold">
+                                👆 Use PL PPV (HTTPS Direct) instead
+                            </text>
+                        </svg>
+                    `);
                 }
             }
         }
