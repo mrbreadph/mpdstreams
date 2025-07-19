@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPD Stream Player - Full HD</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.7.5/shaka-player.compiled.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4CAF50;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stream-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(45deg, #FF9800, #F57C00);
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        select {
+            background: #333;
+            color: white;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        select option {
+            background: #333;
+            color: white;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+            min-height: 300px;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #4CAF50;
+            font-size: 18px;
+        }
+
+        .error {
+            color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #ff4444;
+        }
+
+        .success {
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .quality-info {
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            .stream-selector {
+                flex-direction: column;
+            }
+        }
+
+        .feature-list {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .feature-list h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+        }
+
+        .feature-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-list li:before {
+            content: "✓ ";
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 MPD Stream Player - Full HD Quality</h1>
+        
+        <div class="feature-list">
+            <h3>Player Features:</h3>
+            <ul>
+                <li>Full HD Streaming with Quality Selection</li>
+                <li>Auto-play with Smart Buffering</li>
+                <li>Cross-platform Support (Desktop, Mobile, ChromeOS)</li>
+                <li>No Buffering Optimized Playback</li>
+                <li>Crash Prevention & Error Recovery</li>
+                <li>Adaptive Bitrate Streaming</li>
+            </ul>
+        </div>
+
+        <div class="stream-selector">
+            <button id="stream1-btn" class="active" onclick="loadStream1()">📺 PL PPV (First MPD)</button>
+            <button id="stream2-btn" onclick="loadStream2()">📺 CV PPV (Second MPD)</button>
+        </div>
+
+        <div class="controls">
+            <button onclick="playVideo()" id="play-btn">▶️ Play</button>
+            <button onclick="pauseVideo()">⏸️ Pause</button>
+            <button onclick="restartStream()">🔄 Restart</button>
+            <button onclick="tryAlternativeDRMConfig()">🔧 Fix DRM</button>
+            <select id="quality-select" onchange="changeQuality()">
+                <option value="auto">Auto Quality</option>
+            </select>
+            <button onclick="toggleFullscreen()">🖥️ Fullscreen</button>
+        </div>
+
+        <div class="video-container">
+            <video id="video-player" 
+                   controls 
+                   autoplay 
+                   muted 
+                   playsinline
+                   preload="auto">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+
+        <div class="info-panel">
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-indicator" id="connection-status"></div>
+                    <span id="status-text">Initializing...</span>
+                </div>
+                <div class="status-item">
+                    <span id="quality-info">Quality: Auto</span>
+                </div>
+                <div class="status-item">
+                    <span id="stream-info">No stream loaded</span>
+                </div>
+                <div class="status-item">
+                    <span id="buffer-info">Buffer: 0%</span>
+                </div>
+            </div>
+            <div id="error-log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let player;
+        let video;
+        let currentStream = 1;
+
+        // Stream configurations
+        const streams = {
+            1: {
+                name: "PL PPV",
+                manifest: "https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_ppv_main_hd.mpd",
+                key: {
+                    keyId: "549ab7cd35a64bb6bb479ecead04d69d",
+                    key: "829799ed534d11fcadeb4b192467e050"
+                }
+            },
+            2: {
+                name: "CV PPV",
+                manifest: "http://143.44.136.110:6910/001/2/ch00000090990000001173/manifest.mpd?virtualDomain=001.live_hls.zte.com",
+                key: {
+                    keyId: "31363233303438393537383939373636",
+                    key: "375650765372326e6c50544b337a6933"
+                }
+            }
+        };
+
+        // Initialize the application
+        async function initApp() {
+            video = document.getElementById('video-player');
+            
+            // Install Shaka Player polyfills
+            shaka.polyfill.installAll();
+
+            // Check for browser support
+            if (shaka.Player.isBrowserSupported()) {
+                updateStatus('Browser supported, initializing player...', 'success');
+                await initPlayer();
+            } else {
+                updateStatus('Browser is not supported!', 'error');
+                return;
+            }
+        }
+
+        // Initialize Shaka Player
+        async function initPlayer() {
+            try {
+                player = new shaka.Player(video);
+
+                // Configure player for optimal performance
+                player.configure({
+                    streaming: {
+                        bufferingGoal: 30,
+                        rebufferingGoal: 15,
+                        bufferBehind: 30,
+                        retryParameters: {
+                            timeout: 30000,
+                            maxAttempts: 5,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5
+                        },
+                        alwaysStreamText: false,
+                        startAtSegmentBoundary: true,
+                        smallGapLimit: 0.5,
+                        jumpLargeGaps: true,
+                        durationBackoff: 1,
+                        safeSeekOffset: 5,
+                        stallEnabled: true,
+                        stallThreshold: 1,
+                        useNativeHlsOnSafari: true,
+                        preferNativeHls: false
+                    },
+                    drm: {
+                        retryParameters: {
+                            timeout: 30000,
+                            maxAttempts: 3,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5
+                        },
+                        clearKeys: {},
+                        servers: {},
+                        advanced: {}
+                    },
+                    abr: {
+                        enabled: true,
+                        useNetworkInformation: true,
+                        defaultBandwidthEstimate: 5000000, // 5 Mbps for Full HD
+                        switchInterval: 8,
+                        bandwidthUpgradeTarget: 0.85,
+                        bandwidthDowngradeTarget: 0.95
+                    },
+                    preferredAudioLanguage: 'en',
+                    preferredTextLanguage: 'en',
+                    manifest: {
+                        retryParameters: {
+                            timeout: 30000,
+                            maxAttempts: 5,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5
+                        }
+                    }
+                });
+
+                // Configure network engine for CORS and headers
+                player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                    // Remove problematic CORS headers that cause preflight issues
+                    delete request.headers['Access-Control-Allow-Origin'];
+                    delete request.headers['Access-Control-Allow-Methods'];
+                    delete request.headers['Access-Control-Allow-Headers'];
+                    
+                    // Set minimal, safe headers only
+                    if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                        request.headers['Accept'] = 'application/dash+xml,video/vnd.mpeg.dash.mpd,*/*';
+                        request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+                    }
+                    
+                    if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                        request.headers['Accept'] = '*/*';
+                        request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+                    }
+                    
+                    // For license requests
+                    if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+                        request.headers['Content-Type'] = 'application/octet-stream';
+                    }
+                });
+
+                // Set up event listeners
+                setupEventListeners();
+
+                // Load the first stream by default
+                await loadStream1();
+
+                updateStatus('Player initialized successfully', 'success');
+                document.getElementById('connection-status').classList.add('connected');
+
+            } catch (error) {
+                updateStatus(`Player initialization failed: ${error.message}`, 'error');
+                console.error('Player init error:', error);
+            }
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // Player events
+            player.addEventListener('error', onPlayerError);
+            player.addEventListener('adaptation', onAdaptation);
+            player.addEventListener('buffering', onBuffering);
+            player.addEventListener('loading', onLoading);
+            player.addEventListener('loaded', onLoaded);
+            player.addEventListener('trackschanged', onTracksChanged);
+
+            // Video events
+            video.addEventListener('play', () => updateStatus('Playing...', 'success'));
+            video.addEventListener('pause', () => updateStatus('Paused', 'info'));
+            video.addEventListener('waiting', () => updateStatus('Buffering...', 'info'));
+            video.addEventListener('canplay', () => updateStatus('Ready to play', 'success'));
+            video.addEventListener('error', onVideoError);
+            video.addEventListener('progress', updateBufferInfo);
+            video.addEventListener('timeupdate', updateBufferInfo);
+
+            // Quality change detection
+            video.addEventListener('loadedmetadata', updateQualityInfo);
+        }
+
+        // Load Stream 1 (PL PPV)
+        async function loadStream1() {
+            currentStream = 1;
+            updateStreamButtons();
+            
+            // Test stream accessibility first
+            const isAccessible = await testStreamAccessibility(streams[1].manifest);
+            if (!isAccessible) {
+                updateStatus('Stream may not be accessible. Trying anyway...', 'error');
+            }
+            
+            await loadManifest(streams[1]);
+            updateStreamInfo('PL PPV - First MPD');
+        }
+
+        // Load Stream 2 (CV PPV)
+        async function loadStream2() {
+            currentStream = 2;
+            updateStreamButtons();
+            
+            // Test stream accessibility first
+            const isAccessible = await testStreamAccessibility(streams[2].manifest);
+            if (!isAccessible) {
+                updateStatus('Stream may not be accessible. Trying anyway...', 'error');
+            }
+            
+            await loadManifest(streams[2]);
+            updateStreamInfo('CV PPV - Second MPD');
+        }
+
+        // Test if a stream URL is accessible
+        async function testStreamAccessibility(url) {
+            try {
+                const response = await fetch(url, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    headers: {
+                        'Accept': 'application/dash+xml,video/vnd.mpeg.dash.mpd'
+                    }
+                });
+                return true; // If no error, assume accessible
+            } catch (error) {
+                console.warn('Stream accessibility test failed:', error);
+                return false;
+            }
+        }
+
+        // Load manifest with DRM configuration
+        async function loadManifest(streamConfig) {
+            if (!player) {
+                updateStatus('Player not initialized', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('Loading stream...', 'info');
+
+                // Configure clear keys for DRM
+                const clearKeys = {};
+                clearKeys[streamConfig.key.keyId] = streamConfig.key.key;
+
+                player.configure({
+                    drm: {
+                        clearKeys: clearKeys,
+                        servers: {},
+                        advanced: {}
+                    }
+                });
+
+                // Load the manifest
+                await player.load(streamConfig.manifest);
+
+                // Auto-play
+                try {
+                    await video.play();
+                    updateStatus(`${streamConfig.name} loaded and playing`, 'success');
+                } catch (playError) {
+                    if (playError.name === 'NotAllowedError') {
+                        updateStatus(`${streamConfig.name} loaded. Click play to start.`, 'info');
+                        video.muted = false; // Unmute after user interaction
+                    } else {
+                        throw playError;
+                    }
+                }
+
+                // Update quality selector
+                updateQualitySelector();
+
+            } catch (error) {
+                updateStatus(`Failed to load ${streamConfig.name}: ${error.message}`, 'error');
+                console.error('Load error:', error);
+                
+                // Try recovery
+                setTimeout(() => {
+                    updateStatus('Attempting recovery...', 'info');
+                    loadManifest(streamConfig);
+                }, 3000);
+            }
+        }
+
+        // Update quality selector with available tracks
+        function updateQualitySelector() {
+            if (!player) return;
+
+            const tracks = player.getVariantTracks();
+            const qualitySelect = document.getElementById('quality-select');
+            
+            // Clear existing options except auto
+            qualitySelect.innerHTML = '<option value="auto">Auto Quality</option>';
+
+            // Sort tracks by bandwidth (quality)
+            tracks.sort((a, b) => b.bandwidth - a.bandwidth);
+
+            tracks.forEach((track, index) => {
+                const height = track.height || 'Unknown';
+                const bandwidth = Math.round(track.bandwidth / 1000);
+                const label = `${height}p (${bandwidth} kbps)`;
+                
+                const option = document.createElement('option');
+                option.value = track.id;
+                option.textContent = label;
+                qualitySelect.appendChild(option);
+            });
+        }
+
+        // Change video quality
+        function changeQuality() {
+            if (!player) return;
+
+            const qualitySelect = document.getElementById('quality-select');
+            const selectedValue = qualitySelect.value;
+
+            if (selectedValue === 'auto') {
+                player.configure({abr: {enabled: true}});
+                updateStatus('Auto quality enabled', 'info');
+            } else {
+                player.configure({abr: {enabled: false}});
+                const tracks = player.getVariantTracks();
+                const selectedTrack = tracks.find(track => track.id == selectedValue);
+                if (selectedTrack) {
+                    player.selectVariantTrack(selectedTrack, true);
+                    updateStatus(`Quality changed to ${selectedTrack.height}p`, 'info');
+                }
+            }
+        }
+
+        // Event handlers
+        function onPlayerError(event) {
+            const error = event.detail;
+            let errorMessage = `Player error: ${error.message}`;
+            
+            // Provide more specific error information
+            switch (error.code) {
+                case shaka.util.Error.Code.HTTP_ERROR:
+                    errorMessage += ` - Network/HTTP error. Check if the stream URL is accessible.`;
+                    break;
+                case shaka.util.Error.Code.TIMEOUT:
+                    errorMessage += ` - Request timeout. The server may be slow or unreachable.`;
+                    break;
+                case shaka.util.Error.Code.MALFORMED_DATA_URI:
+                    errorMessage += ` - Invalid stream URL format.`;
+                    break;
+                case shaka.util.Error.Code.UNKNOWN_DATA_URI_ENCODING:
+                    errorMessage += ` - Unknown encoding in stream data.`;
+                    break;
+                case shaka.util.Error.Code.BAD_HTTP_STATUS:
+                    errorMessage += ` - Server returned error status: ${error.data?.[1] || 'Unknown'}`;
+                    break;
+                case 6002: // DRM_NO_LICENSE_SERVER_GIVEN
+                    errorMessage = `DRM Error: No license server configured. Trying alternative DRM setup...`;
+                    break;
+                case 6003: // DRM_LICENSE_REQUEST_FAILED
+                    errorMessage += ` - License request failed. Checking DRM configuration...`;
+                    break;
+                case 6007: // DRM_KEY_NOT_FOUND
+                    errorMessage += ` - Decryption key not found. Verifying key configuration...`;
+                    break;
+                default:
+                    errorMessage += ` (Code: ${error.code})`;
+            }
+            
+            updateStatus(errorMessage, 'error');
+            console.error('Player error details:', error);
+            
+            // Auto-recovery for certain errors
+            if (error.category === shaka.util.Error.Category.NETWORK || 
+                error.code === 6002 || error.code === 6003 || error.code === 6007) {
+                updateStatus('Attempting recovery in 3 seconds...', 'info');
+                setTimeout(() => {
+                    tryAlternativeDRMConfig();
+                }, 3000);
+            }
+        }
+
+        function onVideoError(event) {
+            updateStatus(`Video error: ${event.target.error?.message || 'Unknown error'}`, 'error');
+        }
+
+        function onAdaptation() {
+            updateQualityInfo();
+        }
+
+        function onBuffering(event) {
+            const buffering = event.buffering;
+            if (buffering) {
+                updateStatus('Buffering...', 'info');
+            } else {
+                updateStatus('Playing...', 'success');
+            }
+        }
+
+        function onLoading() {
+            updateStatus('Loading...', 'info');
+        }
+
+        function onLoaded() {
+            updateStatus('Stream loaded successfully', 'success');
+            updateQualitySelector();
+        }
+
+        function onTracksChanged() {
+            updateQualitySelector();
+            updateQualityInfo();
+        }
+
+        // Control functions
+        async function playVideo() {
+            try {
+                await video.play();
+                document.getElementById('play-btn').textContent = '⏸️ Pause';
+                document.getElementById('play-btn').onclick = pauseVideo;
+            } catch (error) {
+                updateStatus(`Play error: ${error.message}`, 'error');
+            }
+        }
+
+        function pauseVideo() {
+            video.pause();
+            document.getElementById('play-btn').textContent = '▶️ Play';
+            document.getElementById('play-btn').onclick = playVideo;
+        }
+
+        async function restartStream() {
+            if (currentStream === 1) {
+                await loadStream1();
+            } else {
+                await loadStream2();
+            }
+        }
+
+        // Alternative DRM configuration for error recovery
+        async function tryAlternativeDRMConfig() {
+            if (!player) return;
+            
+            try {
+                const streamConfig = streams[currentStream];
+                updateStatus('Trying alternative DRM configuration...', 'info');
+                
+                // Try without DRM first (for testing)
+                player.configure({
+                    drm: {
+                        clearKeys: {},
+                        servers: {},
+                        advanced: {}
+                    }
+                });
+                
+                // Try loading without DRM
+                try {
+                    await player.load(streamConfig.manifest);
+                    updateStatus(`${streamConfig.name} loaded without DRM`, 'success');
+                    await video.play();
+                    return;
+                } catch (noDrmError) {
+                    updateStatus('Stream requires DRM. Configuring alternative method...', 'info');
+                }
+                
+                // Alternative DRM configuration method
+                const keyId = streamConfig.key.keyId;
+                const key = streamConfig.key.key;
+                
+                // Configure with original keys only
+                const clearKeys = {};
+                clearKeys[keyId] = key;
+                
+                player.configure({
+                    drm: {
+                        clearKeys: clearKeys,
+                        servers: {
+                            'com.widevine.alpha': '',
+                            'com.microsoft.playready': ''
+                        }
+                    }
+                });
+                
+                await player.load(streamConfig.manifest);
+                updateStatus(`${streamConfig.name} loaded with alternative DRM`, 'success');
+                await video.play();
+                
+            } catch (error) {
+                updateStatus(`Alternative DRM failed: ${error.message}`, 'error');
+                console.error('Alternative DRM error:', error);
+                
+                // Final fallback - try loading as unencrypted
+                updateStatus('Trying to load as unencrypted stream...', 'info');
+                try {
+                    player.configure({
+                        drm: {
+                            clearKeys: {},
+                            servers: {},
+                            advanced: {}
+                        }
+                    });
+                    await player.load(streamConfig.manifest);
+                    updateStatus(`${streamConfig.name} loaded as unencrypted`, 'success');
+                    await video.play();
+                } catch (finalError) {
+                    updateStatus(`All recovery attempts failed: ${finalError.message}`, 'error');
+                }
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                video.requestFullscreen().catch(err => {
+                    updateStatus(`Fullscreen error: ${err.message}`, 'error');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // UI update functions
+        function updateStreamButtons() {
+            document.getElementById('stream1-btn').classList.toggle('active', currentStream === 1);
+            document.getElementById('stream2-btn').classList.toggle('active', currentStream === 2);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = message;
+            
+            const errorLog = document.getElementById('error-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            errorLog.appendChild(logEntry);
+            
+            // Keep only last 5 log entries
+            while (errorLog.children.length > 5) {
+                errorLog.removeChild(errorLog.firstChild);
+            }
+            
+            // Auto-scroll to latest log
+            errorLog.scrollTop = errorLog.scrollHeight;
+        }
+
+        function updateStreamInfo(info) {
+            document.getElementById('stream-info').textContent = info;
+        }
+
+        function updateQualityInfo() {
+            if (!player) return;
+
+            const stats = player.getStats();
+            const tracks = player.getVariantTracks();
+            const activeTrack = tracks.find(track => track.active);
+            
+            let qualityText = 'Quality: Auto';
+            if (activeTrack) {
+                qualityText = `Quality: ${activeTrack.height}p @ ${Math.round(activeTrack.bandwidth / 1000)} kbps`;
+            }
+            
+            document.getElementById('quality-info').textContent = qualityText;
+        }
+
+        function updateBufferInfo() {
+            if (!video) return;
+
+            const buffered = video.buffered;
+            if (buffered.length > 0) {
+                const bufferEnd = buffered.end(buffered.length - 1);
+                const currentTime = video.currentTime;
+                const bufferPercent = Math.round((bufferEnd / video.duration) * 100) || 0;
+                
+                document.getElementById('buffer-info').textContent = `Buffer: ${bufferPercent}%`;
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Page is hidden, reduce quality to save bandwidth
+                if (player) {
+                    player.configure({
+                        abr: {
+                            defaultBandwidthEstimate: 1000000 // 1 Mbps
+                        }
+                    });
+                }
+            } else {
+                // Page is visible, restore full quality
+                if (player) {
+                    player.configure({
+                        abr: {
+                            defaultBandwidthEstimate: 5000000 // 5 Mbps
+                        }
+                    });
+                }
+            }
+        });
+
+        // Handle network changes
+        if ('connection' in navigator) {
+            navigator.connection.addEventListener('change', () => {
+                const connection = navigator.connection;
+                const effectiveType = connection.effectiveType;
+                
+                if (effectiveType === '4g') {
+                    player.configure({
+                        abr: {
+                            defaultBandwidthEstimate: 5000000 // 5 Mbps for 4G
+                        }
+                    });
+                } else if (effectiveType === '3g') {
+                    player.configure({
+                        abr: {
+                            defaultBandwidthEstimate: 1500000 // 1.5 Mbps for 3G
+                        }
+                    });
+                } else {
+                    player.configure({
+                        abr: {
+                            defaultBandwidthEstimate: 500000 // 0.5 Mbps for slower connections
+                        }
+                    });
+                }
+                
+                updateStatus(`Network changed to ${effectiveType}`, 'info');
+            });
+        }
+    </script>
+</body>
+</html>

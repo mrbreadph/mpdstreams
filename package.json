@@ -1,0 +1,16 @@
+{
+  "name": "mpd-stream-player",
+  "version": "1.0.0",
+  "description": "MPD Stream Player with CORS Proxy",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "start": "vercel dev"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

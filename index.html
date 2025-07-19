@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPD Stream Player - Vercel Hosted</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.7.5/shaka-player.compiled.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #4CAF50;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stream-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.active {
+            background: linear-gradient(45deg, #FF9800, #F57C00);
+            box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        select {
+            background: #333;
+            color: white;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        select option {
+            background: #333;
+            color: white;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        #video-player {
+            width: 100%;
+            height: auto;
+            min-height: 400px;
+            display: block;
+        }
+
+        .status {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .status.info {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 4px solid #2196F3;
+            color: #81C7F5;
+        }
+
+        .status.success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid #4CAF50;
+            color: #A5D6A7;
+        }
+
+        .status.error {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid #f44336;
+            color: #EF9A9A;
+        }
+
+        .stream-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .quality-selector {
+            margin: 10px 0;
+        }
+
+        .quality-selector select {
+            min-width: 200px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #4CAF50;
+            font-size: 18px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                margin: 10px;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+
+        .deployment-info {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #FFC107;
+            color: #FFF3C4;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 MPD Stream Player - Vercel Hosted</h1>
+        
+        <div class="deployment-info">
+            <strong>🚀 Vercel Deployment Info:</strong><br>
+            • Stream 1 (HTTPS): Direct access ✅<br>
+            • Stream 2 (HTTP): Uses Vercel proxy function 🔄<br>
+            • Cross-device access enabled 📱💻
+        </div>
+
+        <div class="controls">
+            <div class="stream-selector">
+                <button id="stream1-btn" class="active" onclick="loadStream1()">📺 PL PPV (HTTPS Stream)</button>
+                <button id="stream2-btn" onclick="loadStream2()">📺 CV PPV (HTTP Stream via Proxy)</button>
+            </div>
+        </div>
+
+        <div class="quality-selector">
+            <label for="quality-select">Quality: </label>
+            <select id="quality-select" onchange="changeQuality()">
+                <option value="auto">Auto</option>
+            </select>
+        </div>
+
+        <div class="video-container">
+            <video id="video-player" controls autoplay muted></video>
+        </div>
+
+        <div id="status" class="status info">Initializing player...</div>
+
+        <div class="stream-info">
+            <span id="stream-name">Ready to load stream</span>
+            <span id="quality-info">Quality: Auto</span>
+        </div>
+    </div>
+
+    <script>
+        let player;
+        let video;
+        let currentStream = 1;
+
+        // Stream configurations - Updated for Vercel deployment
+        const streams = {
+            1: {
+                name: "PL PPV",
+                manifest: "https://qp-pldt-live-grp-05-prod.akamaized.net/out/u/cg_ppv_main_hd.mpd",
+                key: {
+                    keyId: "549ab7cd35a64bb6bb479ecead04d69d",
+                    key: "829799ed534d11fcadeb4b192467e050"
+                },
+                useProxy: false // HTTPS stream works directly
+            },
+            2: {
+                name: "CV PPV",
+                manifest: "http://143.44.136.110:6910/001/2/ch00000090990000001173/manifest.mpd?virtualDomain=001.live_hls.zte.com",
+                key: {
+                    keyId: "31363233303438393537383939373636",
+                    key: "375650765372326e6c50544b337a6933"
+                },
+                useProxy: true // HTTP stream needs proxy
+            }
+        };
+
+        // Get the proxy URL for the current environment
+        function getProxyUrl(originalUrl) {
+            const baseUrl = window.location.origin;
+            return `${baseUrl}/api/proxy?url=${encodeURIComponent(originalUrl)}`;
+        }
+
+        // Initialize the application
+        async function initApp() {
+            video = document.getElementById('video-player');
+            
+            // Install Shaka Player polyfills
+            shaka.polyfill.installAll();
+
+            // Check for browser support
+            if (shaka.Player.isBrowserSupported()) {
+                updateStatus('Browser supported, initializing player...', 'success');
+                await initPlayer();
+            } else {
+                updateStatus('Browser is not supported!', 'error');
+                return;
+            }
+        }
+
+        // Initialize Shaka Player
+        async function initPlayer() {
+            try {
+                player = new shaka.Player(video);
+
+                // Configure player for optimal performance
+                player.configure({
+                    streaming: {
+                        bufferingGoal: 30,
+                        rebufferingGoal: 15,
+                        bufferBehind: 30,
+                        retryParameters: {
+                            maxAttempts: 5,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5,
+                            timeout: 30000
+                        }
+                    },
+                    manifest: {
+                        retryParameters: {
+                            maxAttempts: 3,
+                            baseDelay: 1000,
+                            backoffFactor: 2,
+                            fuzzFactor: 0.5,
+                            timeout: 10000
+                        }
+                    }
+                });
+
+                // Error handling
+                player.addEventListener('error', (event) => {
+                    console.error('Player error:', event.detail);
+                    updateStatus(`Playback error: ${event.detail.message || 'Unknown error'}`, 'error');
+                });
+
+                // Adaptation events
+                player.addEventListener('adaptation', () => {
+                    updateQualityInfo();
+                });
+
+                // Update quality selector when tracks are loaded
+                player.addEventListener('trackschanged', () => {
+                    updateQualitySelector();
+                });
+
+                updateStatus('Player initialized successfully', 'success');
+
+                // Auto-load first stream
+                await loadStream1();
+
+            } catch (error) {
+                console.error('Player initialization failed:', error);
+                updateStatus(`Failed to initialize player: ${error.message}`, 'error');
+            }
+
+            // Quality change detection
+            video.addEventListener('loadedmetadata', updateQualityInfo);
+        }
+
+        // Load Stream 1 (PL PPV)
+        async function loadStream1() {
+            currentStream = 1;
+            updateStreamButtons();
+            await loadManifest(streams[1]);
+            updateStreamInfo('PL PPV - HTTPS Stream');
+        }
+
+        // Load Stream 2 (CV PPV)
+        async function loadStream2() {
+            currentStream = 2;
+            updateStreamButtons();
+            await loadManifest(streams[2]);
+            updateStreamInfo('CV PPV - HTTP Stream via Proxy');
+        }
+
+        // Load manifest with DRM configuration
+        async function loadManifest(streamConfig) {
+            if (!player) {
+                updateStatus('Player not initialized', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('Loading stream...', 'info');
+
+                // Configure clear keys for DRM
+                const clearKeys = {};
+                clearKeys[streamConfig.key.keyId] = streamConfig.key.key;
+
+                player.configure({
+                    drm: {
+                        clearKeys: clearKeys,
+                        servers: {},
+                        advanced: {}
+                    }
+                });
+
+                // Get the manifest URL (proxy if needed)
+                let manifestUrl = streamConfig.manifest;
+                if (streamConfig.useProxy) {
+                    manifestUrl = getProxyUrl(streamConfig.manifest);
+                    updateStatus('Using proxy for HTTP stream...', 'info');
+                }
+
+                console.log('Loading manifest:', manifestUrl);
+
+                // Load the manifest
+                await player.load(manifestUrl);
+
+                // Auto-play
+                try {
+                    await video.play();
+                    updateStatus(`${streamConfig.name} loaded and playing`, 'success');
+                } catch (playError) {
+                    if (playError.name === 'NotAllowedError') {
+                        updateStatus(`${streamConfig.name} loaded. Click play to start.`, 'info');
+                        video.muted = false; // Unmute after user interaction
+                    } else {
+                        throw playError;
+                    }
+                }
+
+                // Update quality selector
+                updateQualitySelector();
+                updateQualityInfo();
+
+            } catch (error) {
+                console.error('Failed to load manifest:', error);
+                updateStatus(`Failed to load stream: ${error.message}`, 'error');
+                
+                // If proxy failed, suggest manual retry
+                if (streamConfig.useProxy) {
+                    updateStatus('Proxy loading failed. The HTTP stream may be temporarily unavailable.', 'error');
+                }
+            }
+        }
+
+        // Update stream selection buttons
+        function updateStreamButtons() {
+            document.getElementById('stream1-btn').classList.toggle('active', currentStream === 1);
+            document.getElementById('stream2-btn').classList.toggle('active', currentStream === 2);
+        }
+
+        // Update quality selector
+        function updateQualitySelector() {
+            if (!player) return;
+
+            const qualitySelect = document.getElementById('quality-select');
+            const tracks = player.getVariantTracks();
+            
+            // Clear existing options except auto
+            while (qualitySelect.children.length > 1) {
+                qualitySelect.removeChild(qualitySelect.lastChild);
+            }
+
+            // Add quality options
+            const qualities = new Set();
+            tracks.forEach(track => {
+                if (track.height) {
+                    qualities.add(track.height);
+                }
+            });
+
+            Array.from(qualities).sort((a, b) => b - a).forEach(height => {
+                const option = document.createElement('option');
+                option.value = height;
+                option.textContent = `${height}p`;
+                qualitySelect.appendChild(option);
+            });
+        }
+
+        // Change quality
+        function changeQuality() {
+            if (!player) return;
+
+            const qualitySelect = document.getElementById('quality-select');
+            const selectedQuality = qualitySelect.value;
+
+            if (selectedQuality === 'auto') {
+                player.configure({abr: {enabled: true}});
+            } else {
+                const tracks = player.getVariantTracks();
+                const targetTrack = tracks.find(track => track.height == selectedQuality);
+                if (targetTrack) {
+                    player.configure({abr: {enabled: false}});
+                    player.selectVariantTrack(targetTrack, true);
+                }
+            }
+
+            updateQualityInfo();
+        }
+
+        // Update quality info display
+        function updateQualityInfo() {
+            if (!player || !video.videoHeight) return;
+
+            const qualityInfo = document.getElementById('quality-info');
+            const stats = player.getStats();
+            
+            let qualityText = `${video.videoWidth}x${video.videoHeight}`;
+            if (stats.estimatedBandwidth) {
+                const mbps = (stats.estimatedBandwidth / 1000000).toFixed(1);
+                qualityText += ` • ${mbps} Mbps`;
+            }
+            
+            qualityInfo.textContent = `Quality: ${qualityText}`;
+        }
+
+        // Update stream info
+        function updateStreamInfo(streamName) {
+            document.getElementById('stream-name').textContent = streamName;
+        }
+
+        // Update status message
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            console.log(`Status (${type}):`, message);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && video && !video.paused) {
+                // Optionally pause when tab is hidden to save bandwidth
+                // video.pause();
+            }
+        });
+    </script>
+</body>
+</html>
