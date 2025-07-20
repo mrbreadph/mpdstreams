@@ -869,6 +869,7 @@
                 updateStatus(`Configuring for ${connectionQuality} connection...`, 'info');
 
                 // Configure player with adaptive settings based on connection quality
+                // Split configuration to avoid mediaSource timing issues
                 player.configure({
                     streaming: {
                         retryParameters: {
@@ -887,7 +888,6 @@
                         stallSkip: 0.1,
                         jumpLargeGaps: true,
                         durationBackoff: isSlowConnection ? 2 : 1,
-                        forceTransmuxTS: true,
                         liveEdgeThreshold: isSlowConnection ? 30 : 15, // More tolerance on slow connections
                         maxLiveDelay: isSlowConnection ? 60 : 30,      // Higher delay tolerance
                         useNativeHlsOnSafari: false,
@@ -914,10 +914,12 @@
                         }
                     },
                     networking: {
-                        maxAttempts: config.maxRetries,
-                        baseDelay: config.baseDelay,
-                        fuzzFactor: 0.2,
-                        timeout: config.timeout
+                        retryParameters: {
+                            maxAttempts: config.maxRetries,
+                            baseDelay: config.baseDelay,
+                            fuzzFactor: 0.2,
+                            timeout: config.timeout
+                        }
                     },
                     // Adaptive ABR based on connection quality
                     abr: {
@@ -938,6 +940,20 @@
                         }
                     }
                 });
+
+                // Configure mediaSource separately if supported
+                try {
+                    if (player.getConfiguration().mediaSource !== undefined) {
+                        player.configure({
+                            mediaSource: {
+                                forceTransmux: true
+                            }
+                        });
+                    }
+                } catch (mediaSourceError) {
+                    console.log('MediaSource configuration skipped:', mediaSourceError.message);
+                    // This is not critical, continue without mediaSource config
+                }
 
                 // Configure network request handler for direct access
                 player.getNetworkingEngine().registerRequestFilter((type, request) => {
