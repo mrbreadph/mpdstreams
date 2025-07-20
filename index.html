@@ -202,6 +202,36 @@
             font-size: 14px;
         }
 
+        .viewer-count {
+            background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 3px 10px rgba(255, 107, 107, 0.3);
+            animation: pulse-glow 3s infinite;
+        }
+
+        .viewer-count .eye-icon {
+            margin-right: 6px;
+            font-size: 16px;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { 
+                box-shadow: 0 3px 10px rgba(255, 107, 107, 0.3);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 5px 20px rgba(255, 107, 107, 0.5);
+                transform: scale(1.02);
+            }
+        }
+
         .small-live-btn {
             background: linear-gradient(45deg, #FF5722, #E64A19);
             color: white;
@@ -406,6 +436,10 @@
             <span class="connection-indicator" id="connection-indicator" style="margin-left: 15px; font-size: 12px; color: #FFC107;">
                 📶 Detecting...
             </span>
+            <div class="viewer-count" id="viewer-count" style="display: none;">
+                <span class="eye-icon">👁️</span>
+                <span id="viewer-number">0</span> watching
+            </div>
         </div>
 
         <div class="quality-selector">
@@ -492,6 +526,141 @@
         let currentStream = 1;
         let isSlowConnection = false;
         let connectionQuality = 'good'; // 'good', 'fair', 'poor'
+        let sessionId = null;
+        let viewerUpdateInterval = null;
+
+        // Simple viewer tracking system
+        function generateSessionId() {
+            return 'viewer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Get current active viewers from localStorage
+        function getActiveViewers() {
+            try {
+                const viewers = JSON.parse(localStorage.getItem('activeViewers') || '{}');
+                const now = Date.now();
+                const activeTimeout = 60000; // 1 minute timeout
+                
+                // Clean up expired sessions
+                const activeViewers = {};
+                let count = 0;
+                
+                for (const [id, timestamp] of Object.entries(viewers)) {
+                    if (now - timestamp < activeTimeout) {
+                        activeViewers[id] = timestamp;
+                        count++;
+                    }
+                }
+                
+                // Save cleaned up list
+                localStorage.setItem('activeViewers', JSON.stringify(activeViewers));
+                return { viewers: activeViewers, count: count };
+            } catch (error) {
+                console.log('Error reading viewers:', error);
+                return { viewers: {}, count: 0 };
+            }
+        }
+
+        // Add current session to active viewers
+        function joinAsViewer() {
+            try {
+                sessionId = generateSessionId();
+                const { viewers } = getActiveViewers();
+                viewers[sessionId] = Date.now();
+                localStorage.setItem('activeViewers', JSON.stringify(viewers));
+                console.log('Joined as viewer:', sessionId);
+                updateViewerDisplay();
+            } catch (error) {
+                console.log('Error joining as viewer:', error);
+            }
+        }
+
+        // Remove current session from active viewers
+        function leaveAsViewer() {
+            try {
+                if (sessionId) {
+                    const { viewers } = getActiveViewers();
+                    delete viewers[sessionId];
+                    localStorage.setItem('activeViewers', JSON.stringify(viewers));
+                    console.log('Left as viewer:', sessionId);
+                }
+            } catch (error) {
+                console.log('Error leaving as viewer:', error);
+            }
+        }
+
+        // Update viewer presence (heartbeat)
+        function updateViewerPresence() {
+            try {
+                if (sessionId) {
+                    const { viewers } = getActiveViewers();
+                    viewers[sessionId] = Date.now();
+                    localStorage.setItem('activeViewers', JSON.stringify(viewers));
+                    updateViewerDisplay();
+                }
+            } catch (error) {
+                console.log('Error updating presence:', error);
+            }
+        }
+
+        // Update the viewer count display
+        function updateViewerDisplay() {
+            const { count } = getActiveViewers();
+            
+            if (count > 0) {
+                document.getElementById('viewer-number').textContent = count.toLocaleString();
+                document.getElementById('viewer-count').style.display = 'flex';
+            } else {
+                document.getElementById('viewer-count').style.display = 'none';
+            }
+        }
+
+        // Start viewer tracking
+        function startViewerTracking() {
+            // Join as a viewer when page loads
+            joinAsViewer();
+            
+            // Update presence every 30 seconds
+            viewerUpdateInterval = setInterval(() => {
+                updateViewerPresence();
+            }, 30000);
+            
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    // User switched tab/minimized - still counting as viewer but less frequent updates
+                    if (viewerUpdateInterval) {
+                        clearInterval(viewerUpdateInterval);
+                        viewerUpdateInterval = setInterval(updateViewerPresence, 60000); // 1 minute when hidden
+                    }
+                } else {
+                    // User came back - resume normal updates
+                    if (viewerUpdateInterval) {
+                        clearInterval(viewerUpdateInterval);
+                        viewerUpdateInterval = setInterval(updateViewerPresence, 30000); // 30 seconds when active
+                    }
+                    updateViewerPresence(); // Immediate update
+                }
+            });
+            
+            // Handle page unload (user leaving)
+            window.addEventListener('beforeunload', () => {
+                leaveAsViewer();
+            });
+            
+            // Handle page close/refresh
+            window.addEventListener('unload', () => {
+                leaveAsViewer();
+            });
+            
+            // Cleanup on browser close (modern browsers)
+            if ('serviceWorker' in navigator) {
+                // For modern browsers, we can use pagehide for better cleanup
+                window.addEventListener('pagehide', () => {
+                    leaveAsViewer();
+                });
+            }
+        }
 
         // Detect connection speed and adjust settings
         function detectConnectionSpeed() {
@@ -836,6 +1005,9 @@
         // Initialize the application
         async function initApp() {
             video = document.getElementById('video-player');
+            
+            // Start viewer tracking
+            startViewerTracking();
             
             // Start datetime updater
             updateDateTime();
