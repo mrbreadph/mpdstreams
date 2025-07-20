@@ -403,6 +403,9 @@
             <div class="live-dot"></div>
             <span class="live-text">LIVE</span>
             <span class="datetime-text" id="live-datetime">Loading...</span>
+            <span class="connection-indicator" id="connection-indicator" style="margin-left: 15px; font-size: 12px; color: #FFC107;">
+                📶 Detecting...
+            </span>
         </div>
 
         <div class="quality-selector">
@@ -487,6 +490,102 @@
         let player;
         let video;
         let currentStream = 1;
+        let isSlowConnection = false;
+        let connectionQuality = 'good'; // 'good', 'fair', 'poor'
+
+        // Detect connection speed and adjust settings
+        function detectConnectionSpeed() {
+            if (navigator.connection) {
+                const connection = navigator.connection;
+                const effectiveType = connection.effectiveType;
+                const downlink = connection.downlink;
+                
+                console.log(`Connection: ${effectiveType}, Downlink: ${downlink} Mbps`);
+                
+                // Classify connection quality
+                if (effectiveType === 'slow-2g' || effectiveType === '2g' || downlink < 1) {
+                    connectionQuality = 'poor';
+                    isSlowConnection = true;
+                    updateConnectionIndicator('📶 Poor', '#ff4444');
+                } else if (effectiveType === '3g' || downlink < 3) {
+                    connectionQuality = 'fair';
+                    isSlowConnection = true;
+                    updateConnectionIndicator('📶 Fair', '#FFC107');
+                } else {
+                    connectionQuality = 'good';
+                    isSlowConnection = false;
+                    updateConnectionIndicator('📶 Good', '#4CAF50');
+                }
+                
+                updateStatus(`Connection detected: ${connectionQuality} (${effectiveType})`, 'info');
+                return connectionQuality;
+            }
+            
+            // Fallback: assume good connection
+            connectionQuality = 'good';
+            isSlowConnection = false;
+            updateConnectionIndicator('📶 Good', '#4CAF50');
+            return 'good';
+        }
+
+        // Update connection indicator in UI
+        function updateConnectionIndicator(text, color) {
+            const indicator = document.getElementById('connection-indicator');
+            if (indicator) {
+                indicator.textContent = text;
+                indicator.style.color = color;
+            }
+        }
+
+        // Get adaptive configuration based on connection quality
+        function getAdaptiveConfig(quality) {
+            const configs = {
+                poor: {
+                    bufferingGoal: 45,           // Larger buffer for stability
+                    rebufferingGoal: 20,         // Higher rebuffer threshold
+                    stallThreshold: 2,           // More tolerant stall detection
+                    switchInterval: 15,          // Slower quality switching
+                    defaultBandwidth: 500000,    // Very conservative start
+                    upgradeTarget: 0.98,         // Very conservative upgrades
+                    downgradeTarget: 0.6,        // Quick downgrades
+                    maxRetries: 10,              // More retry attempts
+                    baseDelay: 3000,             // Longer delays
+                    timeout: 60000,              // Extended timeouts
+                    minBandwidth: 100000,        // Allow very low bitrates
+                    minHeight: 144               // Allow 144p
+                },
+                fair: {
+                    bufferingGoal: 25,           // Medium buffer
+                    rebufferingGoal: 10,         // Medium rebuffer threshold
+                    stallThreshold: 1,           // Standard stall detection
+                    switchInterval: 8,           // Medium quality switching
+                    defaultBandwidth: 1000000,   // Conservative start
+                    upgradeTarget: 0.9,          // Conservative upgrades
+                    downgradeTarget: 0.75,       // Medium downgrades
+                    maxRetries: 8,               // Standard retry attempts
+                    baseDelay: 2000,             // Medium delays
+                    timeout: 40000,              // Medium timeouts
+                    minBandwidth: 300000,        // Medium minimum
+                    minHeight: 240               // Allow 240p minimum
+                },
+                good: {
+                    bufferingGoal: 10,           // Small buffer for low delay
+                    rebufferingGoal: 3,          // Quick rebuffering
+                    stallThreshold: 0.5,         // Quick stall detection
+                    switchInterval: 4,           // Fast quality switching
+                    defaultBandwidth: 2000000,   // Optimistic start
+                    upgradeTarget: 0.85,         // Aggressive upgrades
+                    downgradeTarget: 0.8,        // Quick downgrades
+                    maxRetries: 8,               // Standard retries
+                    baseDelay: 1000,             // Fast delays
+                    timeout: 30000,              // Quick timeouts
+                    minBandwidth: 500000,        // Higher minimum
+                    minHeight: 360               // Higher minimum quality
+                }
+            };
+            
+            return configs[quality] || configs.good;
+        }
 
         // Show error box
         function showErrorBox(title, message, suggestion) {
@@ -518,14 +617,17 @@
                 const stats = player.getStats();
                 const buffered = video.buffered;
                 
-                // Calculate buffer percentage (optimized for live streaming)
+                // Calculate buffer percentage (adaptive for connection quality)
                 let bufferPercent = 0;
                 let liveDelay = 0;
                 if (buffered.length > 0 && video.duration) {
                     const currentTime = video.currentTime;
                     const bufferedEnd = buffered.end(buffered.length - 1);
                     const bufferSeconds = bufferedEnd - currentTime;
-                    bufferPercent = Math.min((bufferSeconds / 15) * 100, 100); // 15 seconds = 100% for live
+                    
+                    // Adaptive buffer calculation based on connection quality
+                    const maxBuffer = isSlowConnection ? 45 : 15; // 45s for slow, 15s for good connections
+                    bufferPercent = Math.min((bufferSeconds / maxBuffer) * 100, 100);
                     
                     // Calculate live delay for live streams
                     if (player.isLive()) {
@@ -545,14 +647,16 @@
                 document.getElementById('bandwidth-bar').style.height = `${bandwidthPercent}%`;
                 document.getElementById('bandwidth-value').textContent = `${bandwidthMbps} Mbps`;
 
-                // Update latency with live delay information
+                // Update latency with adaptive live delay information
                 let latency = Math.max(50, 200 - (bufferPercent * 1.5));
                 let latencyPercent = Math.max(0, 100 - (latency / 500 * 100));
                 
-                // For live streams, show actual live delay instead of simulated latency
+                // For live streams, show actual live delay with adaptive thresholds
                 if (player.isLive() && liveDelay > 0) {
                     latency = liveDelay;
-                    latencyPercent = Math.max(0, 100 - (liveDelay / 30 * 100)); // 30s delay = 0%
+                    // Adaptive delay scale: 60s = 0% for slow connections, 30s = 0% for good connections
+                    const maxDelay = isSlowConnection ? 60 : 30;
+                    latencyPercent = Math.max(0, 100 - (liveDelay / maxDelay * 100));
                 }
                 
                 document.getElementById('latency-bar').style.height = `${latencyPercent}%`;
@@ -606,12 +710,15 @@
             }
         }
 
-        // Start buffer graph updates and live edge monitoring
+        // Start buffer graph updates and adaptive live edge monitoring
         function startBufferGraphUpdates() {
             // Update every second
             setInterval(updateBufferGraph, 1000);
             
-            // Monitor live edge every 10 seconds for PL PPV
+            // Adaptive live edge monitoring based on connection quality
+            const monitorInterval = isSlowConnection ? 20000 : 10000; // 20s for slow, 10s for good
+            const delayThreshold = isSlowConnection ? 45 : 15;         // More tolerance for slow connections
+            
             setInterval(() => {
                 if (player && video && currentStream === 1 && player.isLive()) {
                     const seekRange = player.seekRange();
@@ -619,15 +726,33 @@
                     const liveEdge = seekRange.end;
                     const delay = liveEdge - currentTime;
                     
-                    // If we're more than 15 seconds behind live edge, auto-jump forward
-                    if (delay > 15) {
-                        console.log(`Auto-jumping to live edge. Delay was: ${delay.toFixed(1)}s`);
-                        const targetTime = liveEdge - 3; // 3 seconds from live edge
+                    // Adaptive delay threshold based on connection
+                    if (delay > delayThreshold) {
+                        console.log(`Auto-jumping to live edge. Delay was: ${delay.toFixed(1)}s (threshold: ${delayThreshold}s)`);
+                        const targetTime = liveEdge - (isSlowConnection ? 8 : 3); // More buffer on slow connections
                         video.currentTime = Math.max(targetTime, seekRange.start);
                         updateStatus(`Auto-jumped to live edge (was ${delay.toFixed(1)}s behind)`, 'info');
                     }
                 }
-            }, 10000); // Check every 10 seconds
+            }, monitorInterval);
+            
+            // Monitor for connection changes
+            if (navigator.connection) {
+                navigator.connection.addEventListener('change', () => {
+                    const newQuality = detectConnectionSpeed();
+                    if (newQuality !== connectionQuality) {
+                        updateStatus(`Connection changed to ${newQuality}, optimizing...`, 'info');
+                        // Re-configure player for new connection quality
+                        setTimeout(() => {
+                            if (currentStream === 1) {
+                                loadStream1();
+                            } else {
+                                loadStream2();
+                            }
+                        }, 1000);
+                    }
+                });
+            }
         }
 
         // Update live datetime
@@ -737,76 +862,79 @@
             try {
                 player = new shaka.Player(video);
 
-                // Configure player for LIVE streaming with minimal delay - prioritizing real-time over buffering
+                // Detect connection speed and get adaptive config
+                const connectionQuality = detectConnectionSpeed();
+                const config = getAdaptiveConfig(connectionQuality);
+                
+                updateStatus(`Configuring for ${connectionQuality} connection...`, 'info');
+
+                // Configure player with adaptive settings based on connection quality
                 player.configure({
                     streaming: {
                         retryParameters: {
-                            maxAttempts: 8,  // More retry attempts for stability
-                            baseDelay: 1000, // Faster retry for live streams
-                            backoffFactor: 1.3, // Gentler backoff
+                            maxAttempts: config.maxRetries,
+                            baseDelay: config.baseDelay,
+                            backoffFactor: 1.3,
                             fuzzFactor: 0.2,
-                            timeout: 30000  // Reasonable timeout for live
+                            timeout: config.timeout
                         },
-                        bufferingGoal: 10,      // LOW buffer for minimal delay (10 seconds)
-                        rebufferingGoal: 3,     // Quick rebuffering (3 seconds)
-                        bufferBehind: 15,       // Minimal past content for live
-                        safeSeekOffset: 2,      // Minimal seek offset
-                        stallEnabled: true,     // Enable stall detection
-                        stallThreshold: 0.5,    // Quick stall detection (0.5 seconds)
-                        stallSkip: 0.1,         // Skip small gaps quickly
-                        jumpLargeGaps: true,    // Jump over gaps for live
-                        durationBackoff: 1,     // Quick recovery
-                        forceTransmuxTS: true,  // Force transmuxing for compatibility
-                        liveEdgeThreshold: 15,  // Stay close to live edge (15 seconds max behind)
-                        maxLiveDelay: 30,       // Maximum allowed delay from live (30 seconds)
-                        // Allow cross-origin requests
+                        bufferingGoal: config.bufferingGoal,
+                        rebufferingGoal: config.rebufferingGoal,
+                        bufferBehind: Math.min(config.bufferingGoal * 2, 60), // Adaptive buffer behind
+                        safeSeekOffset: isSlowConnection ? 5 : 2,
+                        stallEnabled: true,
+                        stallThreshold: config.stallThreshold,
+                        stallSkip: 0.1,
+                        jumpLargeGaps: true,
+                        durationBackoff: isSlowConnection ? 2 : 1,
+                        forceTransmuxTS: true,
+                        liveEdgeThreshold: isSlowConnection ? 30 : 15, // More tolerance on slow connections
+                        maxLiveDelay: isSlowConnection ? 60 : 30,      // Higher delay tolerance
                         useNativeHlsOnSafari: false,
-                        // Live streaming priority settings
-                        startAtHighestQuality: false,  // Start conservatively but upgrade quickly
-                        switchHistoryCount: 10  // Less history for faster live decisions
+                        startAtHighestQuality: false,
+                        switchHistoryCount: isSlowConnection ? 20 : 10
                     },
                     manifest: {
                         retryParameters: {
-                            maxAttempts: 5,
-                            baseDelay: 1000,    // Faster manifest retry for live
+                            maxAttempts: Math.ceil(config.maxRetries * 0.6),
+                            baseDelay: config.baseDelay,
                             backoffFactor: 1.3,
                             fuzzFactor: 0.2,
-                            timeout: 15000      // Quick manifest timeout
+                            timeout: Math.min(config.timeout * 0.5, 20000)
                         },
-                        availabilityWindowOverride: 180, // 3 minutes window for live
+                        availabilityWindowOverride: isSlowConnection ? 300 : 180,
                         dash: {
                             clockSyncUri: '',
                             ignoreDrmInfo: false,
                             disableVideo: false,
                             disableAudio: false,
-                            enableFastSwitching: true,  // Faster quality switching for live
-                            multiPeriodBufferSizeLimit: 15, // Smaller buffer for live
-                            liveSyncDuration: 3  // Stay very close to live edge
+                            enableFastSwitching: !isSlowConnection, // Disable fast switching on slow connections
+                            multiPeriodBufferSizeLimit: isSlowConnection ? 30 : 15,
+                            liveSyncDuration: isSlowConnection ? 10 : 3
                         }
                     },
-                    // Enhanced networking for live streaming
                     networking: {
-                        maxAttempts: 5,
-                        baseDelay: 1000,    // Faster networking retry
+                        maxAttempts: config.maxRetries,
+                        baseDelay: config.baseDelay,
                         fuzzFactor: 0.2,
-                        timeout: 25000      // Reasonable timeout for live
+                        timeout: config.timeout
                     },
-                    // ABR optimized for LIVE streaming with PL PPV priority
+                    // Adaptive ABR based on connection quality
                     abr: {
                         enabled: true,
-                        defaultBandwidthEstimate: 2000000,  // Start higher for PL PPV quality
-                        switchInterval: 4,      // Quick switching for live adaptation
-                        bandwidthUpgradeTarget: 0.85,   // Aggressive upgrade for better quality
-                        bandwidthDowngradeTarget: 0.8,  // Quick downgrade to maintain live
+                        defaultBandwidthEstimate: config.defaultBandwidth,
+                        switchInterval: config.switchInterval,
+                        bandwidthUpgradeTarget: config.upgradeTarget,
+                        bandwidthDowngradeTarget: config.downgradeTarget,
                         restrictions: {
-                            minBandwidth: 500000,      // Higher minimum for live quality
-                            maxBandwidth: Infinity,    // No max limit for PL PPV
-                            minHeight: 360,            // Higher minimum for live streams
-                            maxHeight: Infinity,       // No height limit
-                            minWidth: 640,             // Higher minimum width
-                            maxWidth: Infinity,        // No width limit
-                            minFrameRate: 15,          // Minimum 15 fps for live
-                            maxFrameRate: Infinity     // No fps limit
+                            minBandwidth: config.minBandwidth,
+                            maxBandwidth: isSlowConnection ? 5000000 : Infinity, // Cap bandwidth on slow connections
+                            minHeight: config.minHeight,
+                            maxHeight: isSlowConnection ? 720 : Infinity,        // Cap quality on slow connections
+                            minWidth: config.minHeight >= 240 ? 426 : 256,
+                            maxWidth: isSlowConnection ? 1280 : Infinity,
+                            minFrameRate: isSlowConnection ? 10 : 15,
+                            maxFrameRate: Infinity
                         }
                     }
                 });
@@ -905,49 +1033,8 @@
                         clearKeys: clearKeys,
                         servers: {},
                         advanced: {}
-                    },
-                    streaming: {
-                        retryParameters: {
-                            maxAttempts: 8,     // More attempts for slow connections
-                            baseDelay: 2000,    // Longer delays
-                            backoffFactor: 1.5, // Gentler backoff
-                            fuzzFactor: 0.3,
-                            timeout: 45000      // Extended timeout
-                        },
-                        bufferingGoal: 60,       // Large buffer for stability
-                        rebufferingGoal: 30,     // Conservative rebuffering
-                        bufferBehind: 60,        // Keep more past content
-                        safeSeekOffset: 5,       // Safer seeking
-                        stallEnabled: true,      // Handle stalls gracefully
-                        stallThreshold: 1,       // 1 second before considering stall
-                        jumpLargeGaps: true,     // Skip gaps to maintain playback
-                        forceTransmuxTS: true    // Better compatibility
-                    },
-                    manifest: {
-                        retryParameters: {
-                            maxAttempts: 5,
-                            baseDelay: 2000,
-                            backoffFactor: 1.5,
-                            fuzzFactor: 0.3,
-                            timeout: 20000
-                        }
-                    },
-                    // Optimized ABR for slow connections
-                    abr: {
-                        enabled: true,
-                        defaultBandwidthEstimate: 800000,   // Conservative 800kbps start
-                        switchInterval: 10,                 // Wait 10 seconds between switches
-                        bandwidthUpgradeTarget: 0.95,       // Very conservative upgrade
-                        bandwidthDowngradeTarget: 0.7,      // Quick downgrade on issues
-                        restrictions: {
-                            minBandwidth: 100000,           // Allow very low bitrates
-                            maxBandwidth: 10000000,         // Cap at 10Mbps for stability
-                            minHeight: 144,                 // Allow 144p for very slow connections
-                            maxHeight: 1080,                // Cap at 1080p to avoid overload
-                            minWidth: 256,
-                            maxWidth: 1920
-                        }
                     }
+                    // Note: Keep existing streaming config from initPlayer for live optimization
                 });
 
                 // Load the manifest directly
