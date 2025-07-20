@@ -393,8 +393,8 @@
         
         <div class="controls">
             <div class="stream-selector">
-                <button id="stream1-btn" class="active" onclick="loadStream1()">📺 PL PPV (HTTPS Direct)</button>
-                <button id="stream2-btn" onclick="loadStream2()">📺 CV PPV (HTTP Direct)</button>
+                <button id="stream1-btn" class="active" onclick="loadStream1()">🎯 PL PPV (PRIORITY LIVE)</button>
+                <button id="stream2-btn" onclick="loadStream2()">📺 CV PPV (Backup)</button>
             </div>
         </div>
 
@@ -443,7 +443,7 @@
                     </div>
                 </div>
                 <div class="graph-item">
-                    <div class="graph-label">Latency</div>
+                    <div class="graph-label">Live Delay</div>
                     <div class="graph-bar">
                         <div class="graph-fill latency-fill" id="latency-bar" style="height: 0%"></div>
                         <div class="graph-value" id="latency-value">0ms</div>
@@ -518,13 +518,20 @@
                 const stats = player.getStats();
                 const buffered = video.buffered;
                 
-                // Calculate buffer percentage
+                // Calculate buffer percentage (optimized for live streaming)
                 let bufferPercent = 0;
+                let liveDelay = 0;
                 if (buffered.length > 0 && video.duration) {
                     const currentTime = video.currentTime;
                     const bufferedEnd = buffered.end(buffered.length - 1);
                     const bufferSeconds = bufferedEnd - currentTime;
-                    bufferPercent = Math.min((bufferSeconds / 30) * 100, 100); // 30 seconds = 100%
+                    bufferPercent = Math.min((bufferSeconds / 15) * 100, 100); // 15 seconds = 100% for live
+                    
+                    // Calculate live delay for live streams
+                    if (player.isLive()) {
+                        const seekRange = player.seekRange();
+                        liveDelay = Math.max(0, seekRange.end - currentTime);
+                    }
                 }
 
                 // Update buffer bar
@@ -538,11 +545,19 @@
                 document.getElementById('bandwidth-bar').style.height = `${bandwidthPercent}%`;
                 document.getElementById('bandwidth-value').textContent = `${bandwidthMbps} Mbps`;
 
-                // Update latency (simulated based on buffer health)
-                const latency = Math.max(50, 200 - (bufferPercent * 1.5));
-                const latencyPercent = Math.max(0, 100 - (latency / 500 * 100));
+                // Update latency with live delay information
+                let latency = Math.max(50, 200 - (bufferPercent * 1.5));
+                let latencyPercent = Math.max(0, 100 - (latency / 500 * 100));
+                
+                // For live streams, show actual live delay instead of simulated latency
+                if (player.isLive() && liveDelay > 0) {
+                    latency = liveDelay;
+                    latencyPercent = Math.max(0, 100 - (liveDelay / 30 * 100)); // 30s delay = 0%
+                }
+                
                 document.getElementById('latency-bar').style.height = `${latencyPercent}%`;
-                document.getElementById('latency-value').textContent = `${Math.round(latency)}ms`;
+                document.getElementById('latency-value').textContent = 
+                    player.isLive() ? `${liveDelay.toFixed(1)}s` : `${Math.round(latency)}ms`;
 
                 // Update quality
                 const currentHeight = video.videoHeight || 0;
@@ -591,10 +606,28 @@
             }
         }
 
-        // Start buffer graph updates
+        // Start buffer graph updates and live edge monitoring
         function startBufferGraphUpdates() {
             // Update every second
             setInterval(updateBufferGraph, 1000);
+            
+            // Monitor live edge every 10 seconds for PL PPV
+            setInterval(() => {
+                if (player && video && currentStream === 1 && player.isLive()) {
+                    const seekRange = player.seekRange();
+                    const currentTime = video.currentTime;
+                    const liveEdge = seekRange.end;
+                    const delay = liveEdge - currentTime;
+                    
+                    // If we're more than 15 seconds behind live edge, auto-jump forward
+                    if (delay > 15) {
+                        console.log(`Auto-jumping to live edge. Delay was: ${delay.toFixed(1)}s`);
+                        const targetTime = liveEdge - 3; // 3 seconds from live edge
+                        video.currentTime = Math.max(targetTime, seekRange.start);
+                        updateStatus(`Auto-jumped to live edge (was ${delay.toFixed(1)}s behind)`, 'info');
+                    }
+                }
+            }, 10000); // Check every 10 seconds
         }
 
         // Update live datetime
@@ -612,36 +645,37 @@
             document.getElementById('live-datetime').textContent = now.toLocaleString(undefined, options);
         }
 
-        // Refresh live feed
+        // Refresh live feed - Aggressive live edge seeking
         async function refreshLive() {
-            updateStatus('Refreshing live feed...', 'info');
+            updateStatus('Jumping to live edge...', 'info');
             
             if (player && video) {
                 try {
-                    // Seek to live edge
+                    // Force jump to live edge for minimal delay
                     if (player.isLive()) {
                         const seekRange = player.seekRange();
                         if (seekRange.end > 0) {
-                            video.currentTime = seekRange.end;
-                            updateStatus('Jumped to live edge!', 'success');
+                            // Jump to the very end minus 2 seconds for stability
+                            const livePosition = seekRange.end - 2;
+                            video.currentTime = Math.max(livePosition, seekRange.start);
+                            updateStatus('At live edge! Minimal delay achieved.', 'success');
                         }
                     } else {
-                        // Reload the current stream
+                        // Reload the current stream with priority on PL PPV
+                        updateStatus('Reloading for live edge...', 'info');
                         if (currentStream === 1) {
                             await loadStream1();
                         } else {
-                            await loadStream2();
+                            // Switch to PL PPV for better live performance
+                            updateStatus('Switching to PL PPV for optimal live performance...', 'info');
+                            await loadStream1();
                         }
                     }
                 } catch (error) {
                     console.error('Live refresh error:', error);
-                    updateStatus('Live refresh failed, reloading stream...', 'error');
-                    // Fallback: reload current stream
-                    if (currentStream === 1) {
-                        await loadStream1();
-                    } else {
-                        await loadStream2();
-                    }
+                    updateStatus('Live refresh failed, switching to PL PPV...', 'error');
+                    // Always fallback to PL PPV as it's our priority stream
+                    await loadStream1();
                 }
             }
         }
@@ -703,37 +737,77 @@
             try {
                 player = new shaka.Player(video);
 
-                // Configure player for optimal direct access (no proxy)
+                // Configure player for LIVE streaming with minimal delay - prioritizing real-time over buffering
                 player.configure({
                     streaming: {
                         retryParameters: {
-                            maxAttempts: 5,
-                            baseDelay: 1000,
-                            backoffFactor: 2,
-                            fuzzFactor: 0.5,
-                            timeout: 30000
+                            maxAttempts: 8,  // More retry attempts for stability
+                            baseDelay: 1000, // Faster retry for live streams
+                            backoffFactor: 1.3, // Gentler backoff
+                            fuzzFactor: 0.2,
+                            timeout: 30000  // Reasonable timeout for live
                         },
-                        bufferingGoal: 30,
-                        rebufferingGoal: 15,
-                        bufferBehind: 30,
+                        bufferingGoal: 10,      // LOW buffer for minimal delay (10 seconds)
+                        rebufferingGoal: 3,     // Quick rebuffering (3 seconds)
+                        bufferBehind: 15,       // Minimal past content for live
+                        safeSeekOffset: 2,      // Minimal seek offset
+                        stallEnabled: true,     // Enable stall detection
+                        stallThreshold: 0.5,    // Quick stall detection (0.5 seconds)
+                        stallSkip: 0.1,         // Skip small gaps quickly
+                        jumpLargeGaps: true,    // Jump over gaps for live
+                        durationBackoff: 1,     // Quick recovery
+                        forceTransmuxTS: true,  // Force transmuxing for compatibility
+                        liveEdgeThreshold: 15,  // Stay close to live edge (15 seconds max behind)
+                        maxLiveDelay: 30,       // Maximum allowed delay from live (30 seconds)
                         // Allow cross-origin requests
-                        useNativeHlsOnSafari: false
+                        useNativeHlsOnSafari: false,
+                        // Live streaming priority settings
+                        startAtHighestQuality: false,  // Start conservatively but upgrade quickly
+                        switchHistoryCount: 10  // Less history for faster live decisions
                     },
                     manifest: {
                         retryParameters: {
-                            maxAttempts: 3,
-                            baseDelay: 1000,
-                            backoffFactor: 2,
-                            fuzzFactor: 0.5,
-                            timeout: 15000
+                            maxAttempts: 5,
+                            baseDelay: 1000,    // Faster manifest retry for live
+                            backoffFactor: 1.3,
+                            fuzzFactor: 0.2,
+                            timeout: 15000      // Quick manifest timeout
+                        },
+                        availabilityWindowOverride: 180, // 3 minutes window for live
+                        dash: {
+                            clockSyncUri: '',
+                            ignoreDrmInfo: false,
+                            disableVideo: false,
+                            disableAudio: false,
+                            enableFastSwitching: true,  // Faster quality switching for live
+                            multiPeriodBufferSizeLimit: 15, // Smaller buffer for live
+                            liveSyncDuration: 3  // Stay very close to live edge
                         }
                     },
-                    // Enhanced networking for direct HTTP access
+                    // Enhanced networking for live streaming
                     networking: {
-                        maxAttempts: 3,
-                        baseDelay: 1000,
-                        fuzzFactor: 0.5,
-                        timeout: 30000
+                        maxAttempts: 5,
+                        baseDelay: 1000,    // Faster networking retry
+                        fuzzFactor: 0.2,
+                        timeout: 25000      // Reasonable timeout for live
+                    },
+                    // ABR optimized for LIVE streaming with PL PPV priority
+                    abr: {
+                        enabled: true,
+                        defaultBandwidthEstimate: 2000000,  // Start higher for PL PPV quality
+                        switchInterval: 4,      // Quick switching for live adaptation
+                        bandwidthUpgradeTarget: 0.85,   // Aggressive upgrade for better quality
+                        bandwidthDowngradeTarget: 0.8,  // Quick downgrade to maintain live
+                        restrictions: {
+                            minBandwidth: 500000,      // Higher minimum for live quality
+                            maxBandwidth: Infinity,    // No max limit for PL PPV
+                            minHeight: 360,            // Higher minimum for live streams
+                            maxHeight: Infinity,       // No height limit
+                            minWidth: 640,             // Higher minimum width
+                            maxWidth: Infinity,        // No width limit
+                            minFrameRate: 15,          // Minimum 15 fps for live
+                            maxFrameRate: Infinity     // No fps limit
+                        }
                     }
                 });
 
@@ -834,23 +908,44 @@
                     },
                     streaming: {
                         retryParameters: {
-                            maxAttempts: 5,
-                            baseDelay: 1000,
-                            backoffFactor: 2,
-                            fuzzFactor: 0.5,
-                            timeout: 30000
+                            maxAttempts: 8,     // More attempts for slow connections
+                            baseDelay: 2000,    // Longer delays
+                            backoffFactor: 1.5, // Gentler backoff
+                            fuzzFactor: 0.3,
+                            timeout: 45000      // Extended timeout
                         },
-                        bufferingGoal: 30,
-                        rebufferingGoal: 15,
-                        bufferBehind: 30
+                        bufferingGoal: 60,       // Large buffer for stability
+                        rebufferingGoal: 30,     // Conservative rebuffering
+                        bufferBehind: 60,        // Keep more past content
+                        safeSeekOffset: 5,       // Safer seeking
+                        stallEnabled: true,      // Handle stalls gracefully
+                        stallThreshold: 1,       // 1 second before considering stall
+                        jumpLargeGaps: true,     // Skip gaps to maintain playback
+                        forceTransmuxTS: true    // Better compatibility
                     },
                     manifest: {
                         retryParameters: {
-                            maxAttempts: 3,
-                            baseDelay: 1000,
-                            backoffFactor: 2,
-                            fuzzFactor: 0.5,
-                            timeout: 15000
+                            maxAttempts: 5,
+                            baseDelay: 2000,
+                            backoffFactor: 1.5,
+                            fuzzFactor: 0.3,
+                            timeout: 20000
+                        }
+                    },
+                    // Optimized ABR for slow connections
+                    abr: {
+                        enabled: true,
+                        defaultBandwidthEstimate: 800000,   // Conservative 800kbps start
+                        switchInterval: 10,                 // Wait 10 seconds between switches
+                        bandwidthUpgradeTarget: 0.95,       // Very conservative upgrade
+                        bandwidthDowngradeTarget: 0.7,      // Quick downgrade on issues
+                        restrictions: {
+                            minBandwidth: 100000,           // Allow very low bitrates
+                            maxBandwidth: 10000000,         // Cap at 10Mbps for stability
+                            minHeight: 144,                 // Allow 144p for very slow connections
+                            maxHeight: 1080,                // Cap at 1080p to avoid overload
+                            minWidth: 256,
+                            maxWidth: 1920
                         }
                     }
                 });
